@@ -66,34 +66,46 @@ fips-agents --version
 
 ### Creating a Release
 
+**Automated Method (Recommended):**
+
+Use the `/release` slash command in Claude Code:
+
+```
+/release
+```
+
+This command will:
+1. Ask for version number and release notes
+2. Update the changelog in README.md
+3. Run `scripts/release.sh` to:
+   - Update version in `version.py` and `pyproject.toml`
+   - Commit and push changes
+   - Create and push git tag
+   - Trigger GitHub Actions for automated PyPI publishing
+
+**Manual Method:**
+
 **IMPORTANT**: Version numbers must be updated in TWO places:
 1. `src/fips_agents_cli/version.py`
 2. `pyproject.toml`
 
 ```bash
-# 1. Update version in both files:
-#    - src/fips_agents_cli/version.py: __version__ = "0.1.x"
-#    - pyproject.toml: version = "0.1.x"
+# 1. Update version in both files manually or use the script:
+./scripts/release.sh <version> "<commit-message>"
 
-# 2. Update changelog in README.md under ## Changelog section
+# Example:
+./scripts/release.sh 0.1.2 "Add new generator features"
 
-# 3. Commit and push
-git add src/fips_agents_cli/version.py pyproject.toml README.md
-git commit -m "Bump version to 0.1.x"
-git push origin main
-
-# 4. Create and push tag
-git tag v0.1.x
-git push origin v0.1.x
-
-# 5. GitHub Actions automatically (via workflow.yaml):
-#    - Verifies version consistency
-#    - Creates GitHub Release
-#    - Builds packages
-#    - Publishes to PyPI
+# The script handles:
+# - Updating version.py and pyproject.toml
+# - Committing changes (including README.md changelog)
+# - Creating and pushing tag
+# - Triggering GitHub Actions
 ```
 
-See `RELEASE_CHECKLIST.md` for detailed release procedures.
+**Note**: Always update the changelog in README.md before running the script.
+
+See `RELEASE_CHECKLIST.md` for detailed release procedures and troubleshooting.
 
 ## Architecture
 
