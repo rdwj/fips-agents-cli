@@ -64,6 +64,37 @@ pip install -e .
 fips-agents --version
 ```
 
+### Creating a Release
+
+**IMPORTANT**: Version numbers must be updated in TWO places:
+1. `src/fips_agents_cli/version.py`
+2. `pyproject.toml`
+
+```bash
+# 1. Update version in both files:
+#    - src/fips_agents_cli/version.py: __version__ = "0.1.x"
+#    - pyproject.toml: version = "0.1.x"
+
+# 2. Update changelog in README.md under ## Changelog section
+
+# 3. Commit and push
+git add src/fips_agents_cli/version.py pyproject.toml README.md
+git commit -m "Bump version to 0.1.x"
+git push origin main
+
+# 4. Create and push tag
+git tag v0.1.x
+git push origin v0.1.x
+
+# 5. GitHub Actions automatically (via workflow.yaml):
+#    - Verifies version consistency
+#    - Creates GitHub Release
+#    - Builds packages
+#    - Publishes to PyPI
+```
+
+See `RELEASE_CHECKLIST.md` for detailed release procedures.
+
 ## Architecture
 
 ### Module Structure
@@ -148,24 +179,29 @@ def test_something(temp_dir):
 ### pyproject.toml
 
 - **Build System**: Uses Hatchling (not Poetry or setuptools)
-- **Python Version**: Requires ≥3.9, supports 3.9-3.12
+- **Python Version**: Requires ≥3.10, supports 3.10-3.12 (dropped 3.9 in v0.1.1)
 - **Line Length**: Black and Ruff both configured for 100 characters
 - **Entry Point**: `fips-agents = "fips_agents_cli.cli:main"`
 - **Test Configuration**: pytest runs with coverage by default
+- **Version Management**: Version number must match `src/fips_agents_cli/version.py`
 
 ### CI/CD Workflows
 
 **test.yml**: Runs on push/PR to main
-- Matrix testing across Python 3.9, 3.10, 3.11, 3.12
+- Matrix testing across Python 3.10, 3.11, 3.12 (dropped 3.9 support in v0.1.1)
 - Runs pytest with coverage
 - Checks Black formatting
 - Runs Ruff linting
 - Builds distribution and validates with twine
 
-**workflow.yaml**: Publishes to PyPI on GitHub releases
-- Uses trusted publishing (no API key needed)
+**workflow.yaml**: Automated release and PyPI publishing (triggered by version tags)
+- Triggers on `v*.*.*` tags (e.g., `v0.1.1`)
+- Verifies tag version matches both `version.py` and `pyproject.toml`
+- Extracts changelog from README.md
+- Creates GitHub Release automatically
 - Builds wheels and source distributions
-- Uploads to PyPI automatically
+- Publishes to PyPI using trusted publishing (no API key needed)
+- **Important**: This single workflow handles the complete release process - DO NOT create separate release workflows
 
 ## Common Development Patterns
 
