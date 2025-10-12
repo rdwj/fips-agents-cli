@@ -14,19 +14,31 @@ A command-line tool for creating and managing FIPS-compliant AI agent projects, 
 
 ## Installation
 
-### Using pipx (Recommended)
+**Recommended:** Install with [pipx](https://pipx.pypa.io/) for isolated command-line tools:
 
 ```bash
 pipx install fips-agents-cli
 ```
 
-### Using pip
+pipx installs the CLI in an isolated environment while making it globally available. This prevents dependency conflicts with other Python packages.
+
+<details>
+<summary><b>Alternative: Using pip</b></summary>
+
+If you prefer pip or don't have pipx installed:
 
 ```bash
 pip install fips-agents-cli
 ```
 
-### From Source (Development)
+**Note:** Consider using a virtual environment to avoid dependency conflicts.
+
+</details>
+
+<details>
+<summary><b>Alternative: Install from source (for development)</b></summary>
+
+For contributing or local development:
 
 ```bash
 # Clone the repository
@@ -40,6 +52,8 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install in editable mode with dev dependencies
 pip install -e .[dev]
 ```
+
+</details>
 
 ## Quick Start
 
