@@ -126,7 +126,9 @@ class TestGenerateToolCommand:
 
             assert result.exit_code == 0
             assert "dry run" in result.output.lower()
-            assert "src/tools/test_tool.py" in result.output
+            # Rich console may wrap long paths, so check for path components
+            output_normalized = result.output.replace("\n", "")
+            assert "src/tools/test_tool.py" in output_normalized
 
             # Verify files were NOT created
             assert not (mock_mcp_project / "src" / "tools" / "test_tool.py").exists()

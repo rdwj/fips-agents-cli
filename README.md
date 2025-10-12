@@ -400,7 +400,7 @@ fips-agents-cli/
 
 ## Requirements
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - Git (for cloning templates and initializing repositories)
 
 ## Dependencies
