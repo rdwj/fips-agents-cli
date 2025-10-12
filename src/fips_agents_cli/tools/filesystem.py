@@ -1,7 +1,6 @@
 """Filesystem utilities for project operations."""
 
 from pathlib import Path
-from typing import Optional
 
 from rich.console import Console
 
@@ -54,7 +53,7 @@ def check_directory_empty(path: Path) -> bool:
 
 def validate_target_directory(
     target_path: Path, allow_existing: bool = False
-) -> tuple[bool, Optional[str]]:
+) -> tuple[bool, str | None]:
     """
     Validate that a target directory is suitable for project creation.
 
@@ -86,7 +85,7 @@ def validate_target_directory(
     return True, None
 
 
-def resolve_target_path(project_name: str, target_dir: Optional[str] = None) -> Path:
+def resolve_target_path(project_name: str, target_dir: str | None = None) -> Path:
     """
     Resolve the target path for project creation.
 
@@ -105,7 +104,7 @@ def resolve_target_path(project_name: str, target_dir: Optional[str] = None) -> 
     return base / project_name
 
 
-def get_relative_path(path: Path, base: Optional[Path] = None) -> str:
+def get_relative_path(path: Path, base: Path | None = None) -> str:
     """
     Get a relative path string for display purposes.
 

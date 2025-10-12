@@ -2,7 +2,7 @@
 
 import sys
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import click
 from rich.console import Console
@@ -32,9 +32,9 @@ def generate_component_workflow(
     component_type: str,
     name: str,
     template_vars: dict[str, Any],
-    params_path: Optional[str],
+    params_path: str | None,
     dry_run: bool,
-    description: Optional[str],
+    description: str | None,
 ) -> None:
     """
     Common workflow for generating any component type.
@@ -255,8 +255,8 @@ def tool(
     is_async: bool,
     with_context: bool,
     with_auth: bool,
-    description: Optional[str],
-    params: Optional[str],
+    description: str | None,
+    params: str | None,
     read_only: bool,
     idempotent: bool,
     open_world: bool,
@@ -306,8 +306,8 @@ def resource(
     name: str,
     is_async: bool,
     with_context: bool,
-    description: Optional[str],
-    uri: Optional[str],
+    description: str | None,
+    uri: str | None,
     mime_type: str,
     dry_run: bool,
 ):
@@ -345,8 +345,8 @@ def resource(
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without creating files")
 def prompt(
     name: str,
-    description: Optional[str],
-    params: Optional[str],
+    description: str | None,
+    params: str | None,
     with_schema: bool,
     dry_run: bool,
 ):
@@ -383,7 +383,7 @@ def prompt(
 def middleware(
     name: str,
     is_async: bool,
-    description: Optional[str],
+    description: str | None,
     dry_run: bool,
 ):
     """

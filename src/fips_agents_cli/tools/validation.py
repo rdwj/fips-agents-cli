@@ -3,7 +3,6 @@
 import keyword
 import re
 from pathlib import Path
-from typing import Optional
 
 import tomlkit
 from rich.console import Console
@@ -11,7 +10,7 @@ from rich.console import Console
 console = Console()
 
 
-def find_project_root() -> Optional[Path]:
+def find_project_root() -> Path | None:
     """
     Find the project root by walking up from current directory.
 

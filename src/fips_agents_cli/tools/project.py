@@ -3,7 +3,6 @@
 import re
 import shutil
 from pathlib import Path
-from typing import Optional
 
 import tomlkit
 from rich.console import Console
@@ -11,7 +10,7 @@ from rich.console import Console
 console = Console()
 
 
-def validate_project_name(name: str) -> tuple[bool, Optional[str]]:
+def validate_project_name(name: str) -> tuple[bool, str | None]:
     """
     Validate project name according to Python package naming conventions.
 

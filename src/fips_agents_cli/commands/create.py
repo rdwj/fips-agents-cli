@@ -1,7 +1,6 @@
 """Create command for generating new projects from templates."""
 
 import sys
-from typing import Optional
 
 import click
 from rich.console import Console
@@ -43,7 +42,7 @@ def create():
     default=False,
     help="Skip git repository initialization",
 )
-def mcp_server(project_name: str, target_dir: Optional[str], no_git: bool):
+def mcp_server(project_name: str, target_dir: str | None, no_git: bool):
     """
     Create a new MCP server project from template.
 
