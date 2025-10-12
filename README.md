@@ -495,7 +495,14 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
-### Version 0.1.1 (Current)
+### Version 0.1.2
+
+- Documentation: Updated documentation and improved release management guidance
+- Automation: Added `/create-release` slash command for automated release workflow
+- Automation: Created `scripts/release.sh` for streamlined version management and tagging
+- Documentation: Added `RELEASE_CHECKLIST.md` with comprehensive release procedures
+
+### Version 0.1.1
 
 - Added `fips-agents generate` command group
 - Component generation: tools, resources, prompts, middleware
