@@ -1,7 +1,5 @@
 """Tests for validation utilities."""
 
-
-
 from fips_agents_cli.tools.validation import (
     component_exists,
     find_project_root,
