@@ -26,7 +26,7 @@ jobs:
       - name: Read version from version.py
         id: read_version
         run: |
-          VERSION_PY=$(python -c "from src.fips_agents_cli.version import __version__; print(__version__)")
+          VERSION_PY=$(grep -E '^__version__' src/fips_agents_cli/version.py | cut -d'"' -f2)
           echo "version_py=$VERSION_PY" >> $GITHUB_OUTPUT
 
       - name: Verify version match
