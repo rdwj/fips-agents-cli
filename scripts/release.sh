@@ -96,9 +96,7 @@ echo
 # 5. Commit the changes
 print_info "Committing changes..."
 git add src/fips_agents_cli/version.py pyproject.toml README.md
-git commit -m "Bump version to $VERSION
-
-$COMMIT_MSG"
+git commit -m "$COMMIT_MSG"
 print_success "Changes committed"
 
 # 6. Push to main
