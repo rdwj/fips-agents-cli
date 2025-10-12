@@ -4,7 +4,7 @@ This document outlines the manual and automated steps for releasing a new versio
 
 ## Automated Release Process (Recommended)
 
-With GitHub Actions configured, releases are mostly automated:
+With GitHub Actions configured, releases are fully automated via version tags:
 
 ### 1. Prepare Release
 
@@ -15,7 +15,10 @@ __version__ = "0.1.2"  # Increment version
 
 # 2. Update changelog
 # Edit: README.md under ## Changelog section
-# Add new version section with changes
+# Add new version section:
+### Version 0.1.2
+- Feature: Description
+- Fix: Description
 
 # 3. Commit changes
 git add src/fips_agents_cli/version.py README.md
@@ -23,25 +26,27 @@ git commit -m "Bump version to 0.1.2"
 git push origin main
 ```
 
-### 2. Create GitHub Release
+### 2. Tag and Push
 
-1. Go to: https://github.com/rdwj/fips-agents-cli/releases/new
-2. Click "Choose a tag" and create new tag: `v0.1.2`
-3. Set "Release title": `v0.1.2`
-4. Add release notes (auto-generate or copy from changelog)
-5. Click "Publish release"
+```bash
+# Create and push version tag
+git tag v0.1.2
+git push origin v0.1.2
+```
 
 **GitHub Actions will automatically:**
-- Build distribution packages
-- Run tests
-- Publish to PyPI (using trusted publishing)
-- Upload wheel and source distribution as release assets
+1. Verify tag version matches `version.py`
+2. Extract changelog from README.md
+3. Create GitHub Release with release notes
+4. Build distribution packages
+5. Publish to PyPI (using trusted publishing)
 
 ### 3. Verify Release
 
 1. Check GitHub Actions: https://github.com/rdwj/fips-agents-cli/actions
-2. Verify on PyPI: https://pypi.org/project/fips-agents-cli/
-3. Test installation:
+2. Verify GitHub Release: https://github.com/rdwj/fips-agents-cli/releases
+3. Verify on PyPI: https://pypi.org/project/fips-agents-cli/
+4. Test installation:
    ```bash
    pip install --upgrade fips-agents-cli
    fips-agents --version
@@ -288,10 +293,16 @@ Or use PyPI Trusted Publishing (recommended):
 
 ```bash
 # Automated release (preferred)
-# 1. Update version and changelog
-# 2. Commit and push
-# 3. Create GitHub release with tag v0.1.x
-# 4. GitHub Actions handles the rest
+# 1. Update version in version.py
+# 2. Update changelog in README.md
+# 3. Commit and push to main
+git add src/fips_agents_cli/version.py README.md
+git commit -m "Bump version to 0.1.x"
+git push origin main
+# 4. Create and push tag
+git tag v0.1.x
+git push origin v0.1.x
+# 5. GitHub Actions handles the rest (release creation + PyPI publishing)
 
 # Manual release
 rm -rf dist/ build/ *.egg-info
