@@ -7,9 +7,10 @@ A command-line tool for creating and managing FIPS-compliant AI agent projects, 
 - 🚀 Quick project scaffolding from templates
 - 📦 MCP server project generation
 - 🔧 Automatic project customization
+- ⚡ Component generation (tools, resources, prompts, middleware)
 - 🎨 Beautiful CLI output with Rich
 - ✅ Git repository initialization
-- 🧪 Comprehensive test coverage
+- 🧪 Comprehensive test coverage with auto-run
 
 ## Installation
 
@@ -66,6 +67,25 @@ fips-agents create mcp-server my-server --target-dir ~/projects
 fips-agents create mcp-server my-server --no-git
 ```
 
+### Generate components in an existing project
+
+```bash
+# Navigate to your MCP server project
+cd my-mcp-server
+
+# Generate a new tool
+fips-agents generate tool search_documents --description "Search through documents"
+
+# Generate a resource
+fips-agents generate resource config_data --description "Application configuration"
+
+# Generate a prompt
+fips-agents generate prompt code_review --description "Review code for best practices"
+
+# Generate middleware
+fips-agents generate middleware auth_middleware --description "Authentication middleware"
+```
+
 ## Usage
 
 ### Basic Commands
@@ -78,6 +98,8 @@ fips-agents --version
 fips-agents --help
 fips-agents create --help
 fips-agents create mcp-server --help
+fips-agents generate --help
+fips-agents generate tool --help
 ```
 
 ### Create MCP Server
@@ -106,6 +128,168 @@ fips-agents create mcp-server my-server -t ~/projects
 # Create without git initialization
 fips-agents create mcp-server my-server --no-git
 ```
+
+### Generate Components
+
+The `generate` command group allows you to scaffold MCP components (tools, resources, prompts, middleware) in existing MCP server projects.
+
+**Important**: Run these commands from within your MCP server project directory.
+
+#### Generate Tool
+
+```bash
+fips-agents generate tool <name> [OPTIONS]
+```
+
+**Arguments:**
+- `name`: Tool name in snake_case (e.g., `search_documents`, `fetch_data`)
+
+**Options:**
+- `--description, -d TEXT`: Tool description
+- `--async/--sync`: Generate async or sync function (default: async)
+- `--with-context`: Include FastMCP Context parameter
+- `--with-auth`: Include authentication decorator
+- `--params PATH`: JSON file with parameter definitions
+- `--read-only`: Mark as read-only operation (default: true)
+- `--idempotent`: Mark as idempotent (default: true)
+- `--open-world`: Mark as open-world operation
+- `--return-type TEXT`: Return type annotation (default: str)
+- `--dry-run`: Show what would be generated without creating files
+
+**Examples:**
+
+```bash
+# Basic tool generation
+fips-agents generate tool search_documents --description "Search through documents"
+
+# Tool with context and authentication
+fips-agents generate tool fetch_user_data --description "Fetch user data" --with-context --with-auth
+
+# Tool with parameters from JSON file
+fips-agents generate tool advanced_search --params params.json
+
+# Sync tool with custom return type
+fips-agents generate tool process_data --sync --return-type "dict[str, Any]"
+
+# Dry run to preview
+fips-agents generate tool test_tool --description "Test" --dry-run
+```
+
+#### Generate Resource
+
+```bash
+fips-agents generate resource <name> [OPTIONS]
+```
+
+**Arguments:**
+- `name`: Resource name in snake_case (e.g., `config_data`, `user_profile`)
+
+**Options:**
+- `--description, -d TEXT`: Resource description
+- `--async/--sync`: Generate async or sync function (default: async)
+- `--with-context`: Include FastMCP Context parameter
+- `--uri TEXT`: Resource URI (default: `resource://<name>`)
+- `--mime-type TEXT`: MIME type for resource (default: text/plain)
+- `--dry-run`: Show what would be generated without creating files
+
+**Examples:**
+
+```bash
+# Basic resource
+fips-agents generate resource config_data --description "Application configuration"
+
+# Resource with custom URI
+fips-agents generate resource user_profile --uri "resource://users/{id}" --description "User profile data"
+
+# Resource with specific MIME type
+fips-agents generate resource json_config --mime-type "application/json"
+```
+
+#### Generate Prompt
+
+```bash
+fips-agents generate prompt <name> [OPTIONS]
+```
+
+**Arguments:**
+- `name`: Prompt name in snake_case (e.g., `code_review`, `summarize_text`)
+
+**Options:**
+- `--description, -d TEXT`: Prompt description
+- `--params PATH`: JSON file with parameter definitions
+- `--with-schema`: Include JSON schema in prompt
+- `--dry-run`: Show what would be generated without creating files
+
+**Examples:**
+
+```bash
+# Basic prompt
+fips-agents generate prompt code_review --description "Review code for best practices"
+
+# Prompt with parameters
+fips-agents generate prompt summarize_text --params params.json --with-schema
+```
+
+#### Generate Middleware
+
+```bash
+fips-agents generate middleware <name> [OPTIONS]
+```
+
+**Arguments:**
+- `name`: Middleware name in snake_case (e.g., `auth_middleware`, `rate_limiter`)
+
+**Options:**
+- `--description, -d TEXT`: Middleware description
+- `--async/--sync`: Generate async or sync function (default: async)
+- `--dry-run`: Show what would be generated without creating files
+
+**Examples:**
+
+```bash
+# Basic middleware
+fips-agents generate middleware auth_middleware --description "Authentication middleware"
+
+# Sync middleware
+fips-agents generate middleware rate_limiter --sync --description "Rate limiting middleware"
+```
+
+#### Parameters JSON Schema
+
+When using `--params` flag, provide a JSON file with parameter definitions:
+
+```json
+[
+  {
+    "name": "query",
+    "type": "str",
+    "description": "Search query",
+    "required": true,
+    "min_length": 1,
+    "max_length": 100
+  },
+  {
+    "name": "limit",
+    "type": "int",
+    "description": "Maximum results to return",
+    "required": false,
+    "default": 10,
+    "ge": 1,
+    "le": 100
+  }
+]
+```
+
+**Supported Types:**
+- `str`, `int`, `float`, `bool`
+- `list[str]`, `list[int]`, `list[float]`
+- `Optional[str]`, `Optional[int]`, `Optional[float]`, `Optional[bool]`
+
+**Pydantic Field Constraints:**
+- `min_length`, `max_length` (for strings)
+- `ge`, `le`, `gt`, `lt` (for numbers)
+- `pattern` (for regex validation on strings)
+- `default` (default value when optional)
 
 ## Project Name Requirements
 
@@ -225,6 +409,7 @@ fips-agents-cli/
 - **rich** (>=13.0.0): Terminal output formatting
 - **gitpython** (>=3.1.0): Git operations
 - **tomlkit** (>=0.12.0): TOML file manipulation
+- **jinja2** (>=3.1.2): Template rendering for component generation
 
 ## Contributing
 
@@ -262,6 +447,28 @@ If template cloning fails:
 - Verify the template repository is accessible: https://github.com/rdwj/mcp-server-template
 - Try again later if GitHub is experiencing issues
 
+### "Not in an MCP server project directory"
+
+When using `generate` commands:
+- Ensure you're running the command from within an MCP server project
+- Check that `pyproject.toml` exists with `fastmcp` dependency
+- If the project wasn't created with `fips-agents create mcp-server`, generator templates may be missing
+
+### "Component already exists"
+
+If you see this error:
+- Choose a different component name
+- Manually remove the existing component file from `src/<component-type>/`
+- Check the component type directory for existing files
+
+### Invalid component name
+
+Component names must:
+- Be valid Python identifiers (snake_case)
+- Not be Python keywords (`for`, `class`, etc.)
+- Start with a letter or underscore
+- Contain only letters, numbers, and underscores
+
 ## License
 
 MIT License - see LICENSE file for details
@@ -273,6 +480,16 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.1.1 (Current)
+
+- Added `fips-agents generate` command group
+- Component generation: tools, resources, prompts, middleware
+- Jinja2-based template rendering
+- Parameter validation and JSON schema support
+- Auto-run pytest on generated components
+- Dry-run mode for previewing changes
+- Comprehensive error handling and validation
 
 ### Version 0.1.0 (MVP)
 

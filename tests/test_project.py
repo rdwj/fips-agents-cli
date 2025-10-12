@@ -1,6 +1,5 @@
 """Tests for project customization utilities."""
 
-
 from fips_agents_cli.tools.project import to_module_name, validate_project_name
 
 

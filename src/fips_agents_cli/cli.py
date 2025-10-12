@@ -4,6 +4,7 @@ import click
 from rich.console import Console
 
 from fips_agents_cli.commands.create import create
+from fips_agents_cli.commands.generate import generate
 from fips_agents_cli.version import __version__
 
 console = Console()
@@ -23,6 +24,7 @@ def cli(ctx):
 
 # Register commands
 cli.add_command(create)
+cli.add_command(generate)
 
 
 def main():
