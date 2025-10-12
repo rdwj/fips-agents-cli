@@ -68,10 +68,10 @@ fips-agents --version
 
 **Automated Method (Recommended):**
 
-Use the `/release` slash command in Claude Code:
+Use the `/create-release` slash command in Claude Code:
 
 ```
-/release
+/create-release
 ```
 
 This command will:

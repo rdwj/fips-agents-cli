@@ -47,7 +47,7 @@ Automated release script that handles version bumping, tagging, and triggering t
 
 ### Recommended Usage
 
-Use the `/release` slash command in Claude Code, which will:
+Use the `/create-release` slash command in Claude Code, which will:
 1. Ask for version and release notes
 2. Update changelog in README.md
 3. Call this script automatically
