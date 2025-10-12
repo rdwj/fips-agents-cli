@@ -10,7 +10,7 @@ readme = "README.md"
 requires-python = ">=3.9"
 license = {text = "MIT"}
 authors = [
-    {name = "FIPS Agents Team"}
+    {name = "Wes Jackson", email = "wjackson@redhat.com"}
 ]
 keywords = ["cli", "ai", "agents", "mcp", "fips", "scaffolding", "code-generator"]
 classifiers = [
@@ -43,9 +43,10 @@ dev = [
 [project.scripts]
 fips-agents = "fips_agents_cli.cli:main"
 
-# [project.urls]
-# Homepage = "https://github.com/yourusername/fips-agents-cli"
-# Repository = "https://github.com/yourusername/fips-agents-cli"
+[project.urls]
+Homepage = "https://github.com/rdwj/fips-agents-cli"
+Repository = "https://github.com/rdwj/fips-agents-cli"
+Issues = "https://github.com/rdwj/fips-agents-cli/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fips_agents_cli"]

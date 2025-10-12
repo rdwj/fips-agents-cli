@@ -69,5 +69,22 @@ dmypy.json
 temp/
 tmp/
 
+# Security & Secrets
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+credentials.json
+secrets.yaml
+secrets.yml
+*_key.txt
+*_token.txt
+*_secret.txt
+api_keys.txt
+tokens.txt
+
 # Project specific
 setup_structure.sh

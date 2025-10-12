@@ -29,7 +29,7 @@ pip install fips-agents-cli
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/fips-agents-cli.git
+git clone https://github.com/rdwj/fips-agents-cli.git
 cd fips-agents-cli
 
 # Create virtual environment
@@ -146,7 +146,7 @@ pytest
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/fips-agents-cli.git
+git clone https://github.com/rdwj/fips-agents-cli.git
 cd fips-agents-cli
 
 # Create virtual environment
@@ -268,8 +268,8 @@ MIT License - see LICENSE file for details
 
 ## Links
 
-- **Repository**: https://github.com/yourusername/fips-agents-cli
-- **Issues**: https://github.com/yourusername/fips-agents-cli/issues
+- **Repository**: https://github.com/rdwj/fips-agents-cli
+- **Issues**: https://github.com/rdwj/fips-agents-cli/issues
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
