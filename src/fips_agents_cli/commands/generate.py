@@ -344,15 +344,41 @@ def resource(
 
 @generate.command("prompt")
 @click.argument("name")
+@click.option(
+    "--async/--sync",
+    "is_async",
+    default=False,
+    help="Generate async or sync function (default: sync)",
+)
+@click.option("--with-context", is_flag=True, help="Include FastMCP Context parameter")
 @click.option("--description", "-d", help="Prompt description")
 @click.option("--params", type=click.Path(exists=True), help="JSON file with parameter definitions")
-@click.option("--with-schema", is_flag=True, help="Include JSON schema in prompt")
+@click.option(
+    "--return-type",
+    type=click.Choice(["str", "PromptMessage", "PromptResult", "list[PromptMessage]"]),
+    default="str",
+    help="Return type annotation (default: str)",
+)
+@click.option("--with-schema", is_flag=True, help="Include JSON schema example in prompt body")
+@click.option("--prompt-name", help="Override decorator name (default: use function name)")
+@click.option("--title", help="Human-readable title for the prompt")
+@click.option("--tags", help="Comma-separated tags for categorization")
+@click.option("--disabled", is_flag=True, help="Generate prompt in disabled state")
+@click.option("--meta", help="JSON string of metadata (e.g., '{\"version\": \"1.0\"}')")
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without creating files")
 def prompt(
     name: str,
+    is_async: bool,
+    with_context: bool,
     description: str | None,
     params: str | None,
+    return_type: str,
     with_schema: bool,
+    prompt_name: str | None,
+    title: str | None,
+    tags: str | None,
+    disabled: bool,
+    meta: str | None,
     dry_run: bool,
 ):
     """
@@ -360,16 +386,53 @@ def prompt(
 
     NAME is the prompt name in snake_case (e.g., code_review, summarize_text)
 
-    Example:
+    Examples:
+        # Basic string prompt
         fips-agents generate prompt code_review --description "Review code for best practices"
-        fips-agents generate prompt summarize_text --params params.json
+
+        # Async prompt with Context
+        fips-agents generate prompt fetch_data --async --with-context --return-type PromptMessage
+
+        # Prompt with parameters and schema
+        fips-agents generate prompt analyze_data --params params.json --with-schema
+
+        # Advanced: custom name, tags, metadata
+        fips-agents generate prompt generate_report \\
+            --prompt-name "report_generator" \\
+            --title "Report Generator" \\
+            --tags "reporting,analysis" \\
+            --meta '{"version": "2.0", "author": "data-team"}'
     """
     console.print("\n[bold cyan]Generating Prompt Component[/bold cyan]\n")
 
+    # Parse tags
+    tags_list = [t.strip() for t in tags.split(",")] if tags else None
+
+    # Parse metadata
+    meta_dict = None
+    if meta:
+        try:
+            import json
+
+            meta_dict = json.loads(meta)
+        except json.JSONDecodeError as e:
+            console.print(f"[red]✗[/red] Invalid JSON in --meta: {e}")
+            sys.exit(1)
+
+    # Determine if prompt imports are needed
+    needs_prompt_imports = return_type in ["PromptMessage", "PromptResult", "list[PromptMessage]"]
+
     template_vars = {
+        "async": is_async,
+        "with_context": with_context,
+        "return_type": return_type,
         "with_schema": with_schema,
-        "async": False,  # Prompts are typically not async
-        "return_type": "list[PromptMessage]",
+        "prompt_name": prompt_name,
+        "title": title,
+        "tags": tags_list,
+        "enabled": not disabled,
+        "meta": meta_dict,
+        "needs_prompt_imports": needs_prompt_imports,
     }
 
     generate_component_workflow("prompt", name, template_vars, params, dry_run, description)
