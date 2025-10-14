@@ -495,6 +495,10 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.3
+
+- Improvement: Enhanced prompt creation to comply with FastMCP 2.9+ requirements
+
 ### Version 0.1.2
 
 - Documentation: Updated documentation and improved release management guidance
