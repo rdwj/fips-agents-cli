@@ -103,6 +103,65 @@ def load_template(project_root: Path, component_type: str, template_name: str) -
         raise jinja2.TemplateError(f"Failed to load template {template_name}: {e}") from e
 
 
+def validate_type_annotation(type_str: str) -> tuple[bool, str]:
+    """
+    Validate that a type annotation is properly formatted for FastMCP.
+
+    Args:
+        type_str: Type annotation string (e.g., "dict[str, str]")
+
+    Returns:
+        tuple: (is_valid, error_message)
+
+    Examples:
+        >>> validate_type_annotation("dict")  # Invalid
+        (False, "Bare 'dict' type not allowed. Use dict[str, str] or dict[str, Any]")
+
+        >>> validate_type_annotation("dict[str, str]")  # Valid
+        (True, "")
+    """
+    # Check for bare dict/list without parameters
+    if type_str in ["dict", "list"]:
+        return (
+            False,
+            f"Bare '{type_str}' type not allowed. "
+            f"Use {type_str}[...] with type parameters for FastMCP 2.9.0+ compatibility",
+        )
+
+    # Validate dict types have parameters
+    if type_str.startswith("dict[") or type_str.startswith("dict |"):
+        if not ("[" in type_str and "]" in type_str):
+            return False, "Dict types must include type parameters: dict[key_type, value_type]"
+
+    return True, ""
+
+
+def compute_type_hint(param: dict[str, Any]) -> str:
+    """
+    Compute the full type hint for a parameter, handling optional types.
+
+    Args:
+        param: Parameter definition dictionary
+
+    Returns:
+        Complete type hint string (e.g., "str", "dict[str, str]", "str | None")
+
+    Examples:
+        >>> compute_type_hint({"type": "str", "optional": False})
+        "str"
+
+        >>> compute_type_hint({"type": "dict[str, str]", "optional": True})
+        "dict[str, str] | None"
+    """
+    base_type = param["type"]
+    is_optional = param.get("optional", False) or param.get("required", True) is False
+
+    if is_optional and " | None" not in base_type:
+        return f"{base_type} | None"
+
+    return base_type
+
+
 def load_params_file(params_path: Path) -> list[dict[str, Any]]:
     """
     Load and validate parameter definitions from a JSON file.
@@ -164,23 +223,43 @@ def load_params_file(params_path: Path) -> list[dict[str, Any]]:
 
         # Validate type
         valid_types = [
+            # Simple types
             "str",
             "int",
             "float",
             "bool",
+            # List types (parameterized)
             "list[str]",
             "list[int]",
             "list[float]",
-            "Optional[str]",
-            "Optional[int]",
-            "Optional[float]",
-            "Optional[bool]",
+            "list[bool]",
+            # Dict types (parameterized - REQUIRED for FastMCP 2.9.0+)
+            "dict[str, str]",
+            "dict[str, Any]",
+            "dict[str, int]",
+            "dict[str, float]",
+            "dict[str, bool]",
+            # Optional simple types
+            "str | None",
+            "int | None",
+            "float | None",
+            "bool | None",
+            # Optional complex types
+            "list[str] | None",
+            "list[int] | None",
+            "dict[str, str] | None",
+            "dict[str, Any] | None",
         ]
         if param["type"] not in valid_types:
             raise ValueError(
                 f"Parameter {i} has invalid type: {param['type']}. "
                 f"Valid types: {', '.join(valid_types)}"
             )
+
+        # Validate type formatting for FastMCP compliance
+        is_valid, error_msg = validate_type_annotation(param["type"])
+        if not is_valid:
+            raise ValueError(f"Parameter {i} '{param['name']}': {error_msg}")
 
     return params
 

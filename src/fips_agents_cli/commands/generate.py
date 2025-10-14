@@ -10,6 +10,7 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from fips_agents_cli.tools.generators import (
+    compute_type_hint,
     get_project_info,
     load_params_file,
     load_template,
@@ -105,6 +106,10 @@ def generate_component_workflow(
             sys.exit(1)
     elif "params" not in template_vars:
         template_vars["params"] = []
+
+    # Compute type hints for each parameter
+    for param in template_vars.get("params", []):
+        param["type_hint"] = compute_type_hint(param)
 
     # Step 7: Get project info
     try:
