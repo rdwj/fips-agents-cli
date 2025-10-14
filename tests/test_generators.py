@@ -176,7 +176,9 @@ class TestLoadParamsFile:
             "float",
             "bool",
             "list[str]",
-            "Optional[str]",
+            "str | None",
+            "dict[str, str]",
+            "dict[str, Any]",
         ]
 
         for param_type in valid_types:
