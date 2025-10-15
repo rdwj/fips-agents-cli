@@ -495,6 +495,16 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.7
+
+- **Critical Fix**: Resource generator now automatically extracts URI template parameters (e.g., `{country_code}`, `{id}`) and adds them to function signature
+- **Critical Fix**: Generated resources now comply with FastMCP requirement that URI parameters must match function arguments
+- Fix: Updated test templates to use `.fn` attribute pattern for testing FastMCP decorated functions
+- Fix: Improved `component_exists()` to properly handle subdirectory paths
+- Fix: Removed obsolete `_preview_prompt_utility.py` from template (YAML-based prompts removed)
+- Improvement: Generated resource tests now pass out of the box
+- Improvement: Resource function signatures now include proper type hints and docstring Args sections
+
 ### Version 0.1.6
 
 - Feature: Added `fips-agents patch` command for selective template updates without losing custom code
