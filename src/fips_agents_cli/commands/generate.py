@@ -60,13 +60,33 @@ def generate_component_workflow(
 
     console.print(f"[green]✓[/green] Found project root: {project_root}")
 
-    # Step 2: Validate component name
-    is_valid, error_msg = is_valid_component_name(name)
+    # Step 2: Parse name to handle subdirectories
+    # Support names like "country-profiles/japan" or "checklists/first_trip"
+    name_parts = name.split("/")
+    subdirs = name_parts[:-1]  # Everything except the last part
+    component_name = name_parts[-1]  # Last part is the actual component name
+
+    # Validate component name (just the filename, not the path)
+    is_valid, error_msg = is_valid_component_name(component_name)
     if not is_valid:
         console.print(f"[red]✗[/red] Invalid component name: {error_msg}")
         sys.exit(1)
 
-    console.print(f"[green]✓[/green] Component name '{name}' is valid")
+    # Validate subdirectory names (should be valid Python identifiers)
+    for subdir in subdirs:
+        if not subdir.replace("-", "_").replace("_", "").isidentifier():
+            console.print(
+                f"[red]✗[/red] Invalid subdirectory name: '{subdir}'\n"
+                "[yellow]Hint:[/yellow] Use snake_case or kebab-case (letters, numbers, hyphens, underscores)"
+            )
+            sys.exit(1)
+
+    if subdirs:
+        console.print(
+            f"[green]✓[/green] Component '{component_name}' will be created in {'/'.join(subdirs)}/"
+        )
+    else:
+        console.print(f"[green]✓[/green] Component name '{component_name}' is valid")
 
     # Step 3: Check if component already exists
     if component_exists(project_root, component_type, name):
@@ -93,7 +113,7 @@ def generate_component_workflow(
         )
 
     template_vars["description"] = description
-    template_vars["component_name"] = name
+    template_vars["component_name"] = component_name
 
     # Step 6: Load params file if provided
     if params_path:
@@ -128,8 +148,19 @@ def generate_component_workflow(
     }
     component_dir = component_dir_map[component_type]
 
-    component_file = project_root / "src" / component_dir / f"{name}.py"
-    test_file = project_root / "tests" / component_dir / f"test_{name}.py"
+    # Build component path with subdirectories
+    component_base = project_root / "src" / component_dir
+    test_base = project_root / "tests" / component_dir
+
+    # Handle subdirectories
+    if subdirs:
+        # Create subdirectory path
+        subdir_path = Path(*subdirs)
+        component_file = component_base / subdir_path / f"{component_name}.py"
+        test_file = test_base / subdir_path / f"test_{component_name}.py"
+    else:
+        component_file = component_base / f"{component_name}.py"
+        test_file = test_base / f"test_{component_name}.py"
 
     # Step 9: Dry run - show paths and exit
     if dry_run:
@@ -180,7 +211,37 @@ def generate_component_workflow(
 
     console.print("[green]✓[/green] Generated code passed syntax validation")
 
-    # Step 12: Write files
+    # Step 12: Create subdirectories and __init__.py files if needed
+    if subdirs:
+        # Create subdirectories in src/
+        src_subdir = component_base
+        for subdir in subdirs:
+            src_subdir = src_subdir / subdir
+            src_subdir.mkdir(parents=True, exist_ok=True)
+
+            # Create __init__.py if it doesn't exist
+            init_file = src_subdir / "__init__.py"
+            if not init_file.exists():
+                init_file.write_text(
+                    f'"""{subdir.replace("_", " ").replace("-", " ").title()} package."""\n'
+                )
+                console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
+
+        # Create subdirectories in tests/
+        test_subdir = test_base
+        for subdir in subdirs:
+            test_subdir = test_subdir / subdir
+            test_subdir.mkdir(parents=True, exist_ok=True)
+
+            # Create __init__.py if it doesn't exist
+            init_file = test_subdir / "__init__.py"
+            if not init_file.exists():
+                init_file.write_text(
+                    f'"""{subdir.replace("_", " ").replace("-", " ").title()} tests."""\n'
+                )
+                console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
+
+    # Step 13: Write files
     try:
         write_component_file(component_code, component_file)
         console.print(f"[green]✓[/green] Created: {component_file.relative_to(project_root)}")
@@ -192,7 +253,7 @@ def generate_component_workflow(
         console.print(f"[red]✗[/red] Failed to write files: {e}")
         sys.exit(1)
 
-    # Step 13: Run tests
+    # Step 14: Run tests
     console.print("\n[cyan]Running generated tests...[/cyan]")
     success, output = run_component_tests(project_root, test_file)
 
@@ -206,7 +267,7 @@ def generate_component_workflow(
             "Update them with your actual test cases."
         )
 
-    # Step 14: Success message
+    # Step 15: Success message
     success_message = f"""
 [bold green]✓ Successfully generated {component_type} component![/bold green]
 
@@ -319,11 +380,21 @@ def resource(
     """
     Generate a new resource component.
 
-    NAME is the resource name in snake_case (e.g., config_data, user_profile)
+    NAME is the resource name in snake_case (e.g., config_data, user_profile).
+    Subdirectories are supported using forward slashes (e.g., country-profiles/japan).
 
-    Example:
+    Examples:
+        # Simple resource in resources/ directory
         fips-agents generate resource config_data --description "Application configuration"
+
+        # Resource with URI template
         fips-agents generate resource user_profile --uri "resource://users/{id}"
+
+        # Resource in subdirectory (creates country_profiles/japan.py)
+        fips-agents generate resource country-profiles/japan --description "Japan country profile"
+
+        # Multiple levels of subdirectories
+        fips-agents generate resource checklists/travel/first_trip --description "First trip checklist"
     """
     console.print("\n[bold cyan]Generating Resource Component[/bold cyan]\n")
 
