@@ -495,6 +495,12 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.5
+
+- Feature: Added `.template-info` file to track CLI version and template commit hash in generated projects
+- Improvement: Implemented auto-discovery for tools/resources/prompts/middleware components, eliminating manual registration in `__init__.py` files
+- Improvement: Template components can now be added or removed by simply creating/deleting files—no registry updates required
+
 ### Version 0.1.4
 
 - Fix: Fixed Containerfile in template to remove incorrect prompts/ copy line
