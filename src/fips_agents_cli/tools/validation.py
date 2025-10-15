@@ -105,10 +105,12 @@ def component_exists(project_root: Path, component_type: str, name: str) -> bool
     """
     Check if a component file already exists.
 
+    Supports subdirectory paths (e.g., "country-profiles/japan").
+
     Args:
         project_root: Path to the project root directory
         component_type: Type of component ('tool', 'resource', 'prompt', 'middleware')
-        name: Component name (will check for {name}.py)
+        name: Component name, may include subdirectory path (e.g., "my_tool" or "subdir/my_tool")
 
     Returns:
         bool: True if component file exists, False otherwise
@@ -116,6 +118,8 @@ def component_exists(project_root: Path, component_type: str, name: str) -> bool
     Example:
         >>> root = Path("/path/to/project")
         >>> component_exists(root, "tool", "my_tool")
+        False
+        >>> component_exists(root, "resource", "country-profiles/japan")
         False
     """
     # Map component types to their directory locations
@@ -130,7 +134,19 @@ def component_exists(project_root: Path, component_type: str, name: str) -> bool
         return False
 
     component_dir = component_dirs[component_type]
-    component_file = project_root / "src" / component_dir / f"{name}.py"
+
+    # Parse name to handle subdirectories
+    name_parts = name.split("/")
+    subdirs = name_parts[:-1]
+    component_name = name_parts[-1]
+
+    # Build path with subdirectories
+    component_base = project_root / "src" / component_dir
+    if subdirs:
+        subdir_path = Path(*subdirs)
+        component_file = component_base / subdir_path / f"{component_name}.py"
+    else:
+        component_file = component_base / f"{component_name}.py"
 
     return component_file.exists()
 

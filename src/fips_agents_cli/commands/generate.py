@@ -387,7 +387,7 @@ def resource(
         # Simple resource in resources/ directory
         fips-agents generate resource config_data --description "Application configuration"
 
-        # Resource with URI template
+        # Resource with URI template (parameters automatically extracted)
         fips-agents generate resource user_profile --uri "resource://users/{id}"
 
         # Resource in subdirectory (creates country_profiles/japan.py)
@@ -396,11 +396,32 @@ def resource(
         # Multiple levels of subdirectories
         fips-agents generate resource checklists/travel/first_trip --description "First trip checklist"
     """
+    import re
+
     console.print("\n[bold cyan]Generating Resource Component[/bold cyan]\n")
+
+    # Extract component name from path (without subdirs) for URI default
+    component_name = name.split("/")[-1]
 
     # Default URI if not provided
     if not uri:
-        uri = f"resource://{name}"
+        uri = f"resource://{component_name}"
+
+    # Extract URI template parameters (e.g., {country_code}, {id})
+    uri_params = re.findall(r"\{(\w+)\}", uri)
+
+    # Convert URI parameters to function parameters
+    # Each URI parameter becomes a string parameter in the function signature
+    params_list = [
+        {
+            "name": param,
+            "type": "str",
+            "type_hint": "str",
+            "description": f"URI parameter: {param}",
+            "required": True,
+        }
+        for param in uri_params
+    ]
 
     template_vars = {
         "async": is_async,
@@ -408,6 +429,8 @@ def resource(
         "uri": uri,
         "mime_type": mime_type,
         "return_type": "str",  # Resources typically return strings
+        "params": params_list,  # Add URI parameters
+        "uri_params": uri_params,  # Also pass raw param names for template
     }
 
     generate_component_workflow("resource", name, template_vars, None, dry_run, description)
