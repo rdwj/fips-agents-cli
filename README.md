@@ -495,6 +495,16 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.6
+
+- Feature: Added `fips-agents patch` command for selective template updates without losing custom code
+- Feature: Resource subdirectory support - organize resources in hierarchies (e.g., `country-profiles/japan`)
+- Feature: `generate resource` now supports subdirectory paths for better organization
+- Improvement: Recursive resource loading from subdirectories with automatic discovery
+- Improvement: Patch command shows interactive diffs for files that may be customized
+- Improvement: Template version tracking enables smart updates via `.template-info` file
+- Enhancement: Cleaned up redundant auto-discovery code from template `__init__.py` files
+
 ### Version 0.1.5
 
 - Feature: Added `.template-info` file to track CLI version and template commit hash in generated projects
