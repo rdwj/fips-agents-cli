@@ -495,6 +495,14 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.4
+
+- Fix: Fixed Containerfile in template to remove incorrect prompts/ copy line
+- Fix: Fixed CLI to correctly update entry point script names for new projects
+- Fix: Updated CLI to handle new multi-module template structure (core/, tools/, etc.)
+- Fix: Updated fallback project name to match current template (fastmcp-unified-template)
+- Improvement: Improved messaging when template uses multi-module structure
+
 ### Version 0.1.3
 
 - Improvement: Enhanced prompt creation to comply with FastMCP 2.9+ requirements

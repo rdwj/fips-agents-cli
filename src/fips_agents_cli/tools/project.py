@@ -84,7 +84,7 @@ def update_project_name(project_path: Path, new_name: str) -> None:
             pyproject = tomlkit.parse(f.read())
 
         # Get the old project name from pyproject.toml
-        old_name = pyproject.get("project", {}).get("name", "mcp-server-template")
+        old_name = pyproject.get("project", {}).get("name", "fastmcp-unified-template")
         old_module_name = to_module_name(old_name)
         new_module_name = to_module_name(new_name)
 
@@ -100,13 +100,15 @@ def update_project_name(project_path: Path, new_name: str) -> None:
 
                 for script_name, script_path in old_scripts.items():
                     # Replace old module name with new module name in the path
+                    # (but only if it's actually in the path - new template uses src.main:main)
                     new_script_path = script_path.replace(old_module_name, new_module_name)
 
-                    # If the script name was based on the old project name, update it
+                    # Update the script name to match the new project name
                     if script_name == old_name or script_name == old_module_name:
                         del scripts[script_name]
                         scripts[new_name] = new_script_path
                     else:
+                        # Keep the same script name but update the path if needed
                         scripts[script_name] = new_script_path
 
         # Write updated pyproject.toml
@@ -115,7 +117,7 @@ def update_project_name(project_path: Path, new_name: str) -> None:
 
         console.print("[green]✓[/green] Updated pyproject.toml")
 
-        # Rename source directory
+        # Rename source directory (for templates with single-module structure)
         src_dir = project_path / "src"
         old_src_path = src_dir / old_module_name
         new_src_path = src_dir / new_module_name
@@ -124,10 +126,9 @@ def update_project_name(project_path: Path, new_name: str) -> None:
             shutil.move(str(old_src_path), str(new_src_path))
             console.print(f"[green]✓[/green] Renamed source directory to '{new_module_name}'")
         elif not old_src_path.exists():
-            # Template might have a different structure, log a warning
+            # Template uses multi-module structure (core/, tools/, etc.)
             console.print(
-                f"[yellow]⚠[/yellow] Source directory 'src/{old_module_name}' not found, "
-                "skipping rename"
+                "[dim]Note: Template uses multi-module structure, no directory rename needed[/dim]"
             )
 
         console.print("[green]✓[/green] Project customization complete")
