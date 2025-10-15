@@ -364,7 +364,7 @@ def resource(
 @click.option("--title", help="Human-readable title for the prompt")
 @click.option("--tags", help="Comma-separated tags for categorization")
 @click.option("--disabled", is_flag=True, help="Generate prompt in disabled state")
-@click.option("--meta", help="JSON string of metadata (e.g., '{\"version\": \"1.0\"}')")
+@click.option("--meta", help='JSON string of metadata (e.g., \'{"version": "1.0"}\')')
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without creating files")
 def prompt(
     name: str,
