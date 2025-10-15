@@ -11,7 +11,7 @@ import click
 from rich.console import Console
 from rich.syntax import Syntax
 
-from fips_agents_cli.tools.git_utils import clone_template
+from fips_agents_cli.tools.git import clone_template
 
 console = Console()
 
