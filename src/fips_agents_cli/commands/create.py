@@ -14,6 +14,7 @@ from fips_agents_cli.tools.project import (
     to_module_name,
     update_project_name,
     validate_project_name,
+    write_template_info,
 )
 
 console = Console()
@@ -86,6 +87,7 @@ def mcp_server(project_name: str, target_dir: str | None, no_git: bool):
             sys.exit(1)
 
         # Step 4: Clone template repository
+        template_commit = None
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -93,7 +95,7 @@ def mcp_server(project_name: str, target_dir: str | None, no_git: bool):
         ) as progress:
             progress.add_task(description="Cloning template repository...", total=None)
             try:
-                clone_template(MCP_SERVER_TEMPLATE_URL, target_path)
+                template_commit = clone_template(MCP_SERVER_TEMPLATE_URL, target_path)
             except Exception as e:
                 console.print("\n[red]✗[/red] Failed to clone template repository")
                 console.print(f"[red]Error:[/red] {e}")
@@ -113,6 +115,10 @@ def mcp_server(project_name: str, target_dir: str | None, no_git: bool):
             try:
                 update_project_name(target_path, project_name)
                 cleanup_template_files(target_path)
+                if template_commit:
+                    write_template_info(
+                        target_path, project_name, MCP_SERVER_TEMPLATE_URL, template_commit
+                    )
             except Exception as e:
                 console.print("\n[red]✗[/red] Failed to customize project")
                 console.print(f"[red]Error:[/red] {e}")

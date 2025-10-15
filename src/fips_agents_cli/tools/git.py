@@ -9,7 +9,7 @@ from rich.console import Console
 console = Console()
 
 
-def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> None:
+def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> str:
     """
     Clone a git repository template to a target path.
 
@@ -21,6 +21,9 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> No
         target_path: The local path where the repository should be cloned
         branch: The branch to clone (default: "main")
 
+    Returns:
+        str: The commit hash of the cloned template
+
     Raises:
         git.GitCommandError: If the clone operation fails
         OSError: If there are filesystem permission issues
@@ -28,7 +31,7 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> No
     try:
         # Perform shallow clone for faster operation
         console.print(f"[cyan]Cloning template from {repo_url}...[/cyan]")
-        git.Repo.clone_from(
+        repo = git.Repo.clone_from(
             repo_url,
             str(target_path),
             branch=branch,
@@ -36,11 +39,16 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> No
             single_branch=True,
         )
 
+        # Get the commit hash before removing .git
+        commit_hash = repo.head.commit.hexsha
+
         # Remove .git directory to allow fresh initialization
         git_dir = target_path / ".git"
         if git_dir.exists():
             shutil.rmtree(git_dir)
             console.print("[green]✓[/green] Template cloned successfully")
+
+        return commit_hash
 
     except git.GitCommandError as e:
         console.print(f"[red]✗[/red] Failed to clone template: {e}")

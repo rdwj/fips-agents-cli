@@ -1,11 +1,15 @@
 """Project customization and configuration utilities."""
 
+import json
 import re
 import shutil
+from datetime import datetime, timezone
 from pathlib import Path
 
 import tomlkit
 from rich.console import Console
+
+from fips_agents_cli.version import __version__
 
 console = Console()
 
@@ -161,3 +165,44 @@ def cleanup_template_files(project_path: Path) -> None:
                 console.print(f"[green]✓[/green] Removed template file: {file_path}")
             except Exception as e:
                 console.print(f"[yellow]⚠[/yellow] Could not remove {file_path}: {e}")
+
+
+def write_template_info(
+    project_path: Path,
+    project_name: str,
+    template_url: str,
+    template_commit: str,
+) -> None:
+    """
+    Write template generation metadata to .template-info file.
+
+    Args:
+        project_path: Path to the project root directory
+        project_name: Name of the generated project
+        template_url: URL of the template repository
+        template_commit: Git commit hash of the template
+    """
+    try:
+        template_info = {
+            "generator": {"tool": "fips-agents-cli", "version": __version__},
+            "template": {
+                "url": template_url,
+                "commit": template_commit[:12],  # Short hash
+                "full_commit": template_commit,
+            },
+            "project": {
+                "name": project_name,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+        info_file = project_path / ".template-info"
+        with open(info_file, "w") as f:
+            json.dump(template_info, f, indent=2)
+            f.write("\n")  # Add trailing newline
+
+        console.print("[green]✓[/green] Created template metadata file")
+
+    except Exception as e:
+        # Don't fail the entire operation if this fails
+        console.print(f"[yellow]⚠[/yellow] Could not write template info: {e}")
