@@ -197,3 +197,158 @@ def validate_generator_templates(project_root: Path, component_type: str) -> tup
         )
 
     return True, ""
+
+
+def parse_huggingface_repo(url_or_repo: str) -> tuple[str | None, str]:
+    """
+    Parse HuggingFace repository ID from URL or repo ID format.
+
+    Accepts both full URLs and repo IDs:
+    - https://huggingface.co/ibm-granite/granite-3.1-2b-instruct
+    - ibm-granite/granite-3.1-2b-instruct
+
+    Args:
+        url_or_repo: HuggingFace URL or repo ID
+
+    Returns:
+        tuple: (repo_id, error_message)
+               repo_id is the extracted org/model format if valid, None otherwise
+               error_message is empty string if valid, otherwise contains error description
+
+    Examples:
+        >>> parse_huggingface_repo("https://huggingface.co/ibm-granite/granite-3.1-2b-instruct")
+        ('ibm-granite/granite-3.1-2b-instruct', '')
+        >>> parse_huggingface_repo("ibm-granite/granite-3.1-2b-instruct")
+        ('ibm-granite/granite-3.1-2b-instruct', '')
+        >>> parse_huggingface_repo("invalid")
+        (None, 'Invalid HuggingFace repository format...')
+    """
+    # Remove trailing slashes
+    url_or_repo = url_or_repo.rstrip("/")
+
+    # Check if it's a URL
+    if url_or_repo.startswith("http://") or url_or_repo.startswith("https://"):
+        # Extract repo ID from URL
+        # Expected format: https://huggingface.co/org/model
+        match = re.match(r"https?://(?:www\.)?huggingface\.co/([^/]+/[^/]+)(?:/.*)?$", url_or_repo)
+        if match:
+            return match.group(1), ""
+        else:
+            return None, (
+                "Invalid HuggingFace URL format.\n"
+                "Expected: https://huggingface.co/org/model-name"
+            )
+    else:
+        # Assume it's a repo ID in org/model format
+        # Validate format
+        if "/" not in url_or_repo:
+            return None, (
+                "Invalid HuggingFace repository ID format.\n"
+                "Expected: org/model-name (e.g., ibm-granite/granite-3.1-2b-instruct)"
+            )
+
+        # Basic validation: should have exactly one slash
+        parts = url_or_repo.split("/")
+        if len(parts) != 2:
+            return None, (
+                "Invalid HuggingFace repository ID format.\n"
+                "Expected: org/model-name (e.g., ibm-granite/granite-3.1-2b-instruct)"
+            )
+
+        org, model = parts
+        if not org or not model:
+            return None, (
+                "Invalid HuggingFace repository ID format.\n"
+                "Organization and model name cannot be empty."
+            )
+
+        return url_or_repo, ""
+
+
+def validate_quay_uri(uri: str) -> tuple[bool, str, dict[str, str]]:
+    """
+    Validate Quay container registry URI with tag.
+
+    Expected format: registry.com/org/repo:tag
+
+    Args:
+        uri: Quay container registry URI
+
+    Returns:
+        tuple: (is_valid, error_message, components)
+               is_valid is True if valid, False otherwise
+               error_message is empty string if valid, otherwise contains error description
+               components is dict with 'registry', 'repo', 'tag' keys if valid
+
+    Examples:
+        >>> validate_quay_uri("quay.io/wjackson/models:granite-3.1-2b")
+        (True, '', {'registry': 'quay.io', 'repo': 'wjackson/models', 'tag': 'granite-3.1-2b'})
+        >>> validate_quay_uri("quay.io/wjackson/models")
+        (False, 'Missing tag...', {})
+    """
+    # Check for tag
+    if ":" not in uri:
+        return (
+            False,
+            (
+                "Missing tag in container URI.\n"
+                "Expected format: registry.com/org/repo:tag\n"
+                "Example: quay.io/wjackson/models:granite-3.1-2b-instruct"
+            ),
+            {},
+        )
+
+    # Split registry and tag
+    uri_without_tag, tag = uri.rsplit(":", 1)
+
+    if not tag:
+        return (
+            False,
+            (
+                "Empty tag in container URI.\n"
+                "Expected format: registry.com/org/repo:tag\n"
+                "Example: quay.io/wjackson/models:granite-3.1-2b-instruct"
+            ),
+            {},
+        )
+
+    # Validate registry format (should contain at least one dot)
+    if "/" not in uri_without_tag:
+        return (
+            False,
+            (
+                "Invalid container URI format.\n"
+                "Expected format: registry.com/org/repo:tag\n"
+                "Example: quay.io/wjackson/models:granite-3.1-2b-instruct"
+            ),
+            {},
+        )
+
+    # Split registry and repository
+    parts = uri_without_tag.split("/", 1)
+    if len(parts) != 2:
+        return (
+            False,
+            (
+                "Invalid container URI format.\n"
+                "Expected format: registry.com/org/repo:tag\n"
+                "Example: quay.io/wjackson/models:granite-3.1-2b-instruct"
+            ),
+            {},
+        )
+
+    registry, repo = parts
+
+    # Basic registry validation (should look like a domain)
+    if "." not in registry:
+        return (
+            False,
+            (
+                "Invalid registry format (should be a domain like quay.io).\n"
+                "Expected format: registry.com/org/repo:tag\n"
+                "Example: quay.io/wjackson/models:granite-3.1-2b-instruct"
+            ),
+            {},
+        )
+
+    return True, "", {"registry": registry, "repo": repo, "tag": tag}

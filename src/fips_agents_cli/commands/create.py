@@ -7,6 +7,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
+from fips_agents_cli.commands.model_car import model_car
 from fips_agents_cli.tools.filesystem import resolve_target_path, validate_target_directory
 from fips_agents_cli.tools.git import clone_template, init_repository, is_git_installed
 from fips_agents_cli.tools.project import (
@@ -27,6 +28,10 @@ MCP_SERVER_TEMPLATE_URL = "https://github.com/rdwj/mcp-server-template"
 def create():
     """Create new projects from templates."""
     pass
+
+
+# Register subcommands
+create.add_command(model_car)
 
 
 @create.command("mcp-server")

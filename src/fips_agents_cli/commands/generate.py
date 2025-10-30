@@ -307,6 +307,11 @@ def generate():
 )
 @click.option("--with-context", is_flag=True, help="Include FastMCP Context parameter")
 @click.option("--with-auth", is_flag=True, help="Include authentication decorator")
+@click.option(
+    "--scopes",
+    help='Required OAuth scopes (comma-separated, e.g., "read:data,write:data")',
+)
+@click.option("--with-elicitation", is_flag=True, help="Include elicitation example code")
 @click.option("--description", "-d", help="Tool description")
 @click.option("--params", type=click.Path(exists=True), help="JSON file with parameter definitions")
 @click.option(
@@ -321,6 +326,8 @@ def tool(
     is_async: bool,
     with_context: bool,
     with_auth: bool,
+    scopes: str | None,
+    with_elicitation: bool,
     description: str | None,
     params: str | None,
     read_only: bool,
@@ -334,16 +341,47 @@ def tool(
 
     NAME is the tool name in snake_case (e.g., search_documents, fetch_data)
 
-    Example:
+    Examples:
+        # Basic tool
         fips-agents generate tool search_documents --description "Search through documents"
+
+        # Tool with context and parameters
         fips-agents generate tool fetch_data --params params.json --with-context
+
+        # Interactive tool with elicitation
+        fips-agents generate tool delete_resources --with-elicitation --with-context
+
+        # Protected tool with authentication
+        fips-agents generate tool delete_data --with-auth --scopes "write:data,admin"
+
+        # Protected tool (interactive scope prompting)
+        fips-agents generate tool get_profile --with-auth
     """
     console.print("\n[bold cyan]Generating Tool Component[/bold cyan]\n")
+
+    # Handle scope prompting for authenticated tools
+    required_scopes = []
+    if with_auth:
+        if scopes:
+            # Parse comma-separated scopes from CLI
+            required_scopes = [s.strip() for s in scopes.split(",") if s.strip()]
+        else:
+            # Interactive prompting with default
+            scopes_input = click.prompt(
+                "Enter required OAuth scopes (comma-separated)",
+                type=str,
+                default="read:data",
+            )
+            required_scopes = [s.strip() for s in scopes_input.split(",") if s.strip()]
+
+        console.print(f"[green]✓[/green] Required scopes: {', '.join(required_scopes)}")
 
     template_vars = {
         "async": is_async,
         "with_context": with_context,
         "with_auth": with_auth,
+        "required_scopes": required_scopes,  # Pass as list for template
+        "with_elicitation": with_elicitation,
         "read_only": read_only,
         "idempotent": idempotent,
         "open_world": open_world,
