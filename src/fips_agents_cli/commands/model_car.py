@@ -7,7 +7,11 @@ from rich.console import Console
 from rich.panel import Panel
 
 from fips_agents_cli.tools.filesystem import resolve_target_path, validate_target_directory
-from fips_agents_cli.tools.validation import parse_huggingface_repo, validate_quay_uri
+from fips_agents_cli.tools.validation import (
+    check_registry_login,
+    parse_huggingface_repo,
+    validate_quay_uri,
+)
 
 console = Console()
 
@@ -139,13 +143,60 @@ echo "=========================================="
 echo "✅ Successfully pushed to {quay_uri}"
 echo "=========================================="
 echo ""
-echo "💡 To reclaim disk space, run: ./cleanup.sh"
+
+# Offer to delete local container image
+echo "🧹 Cleanup Options"
 echo ""
+echo "The local container image is no longer needed since it's in the registry."
+if command -v podman &> /dev/null; then
+    image_size=$(podman images {image_tag} --format "{{{{.Size}}}}" 2>/dev/null || echo "unknown")
+    if [ -n "$image_size" ] && [ "$image_size" != "unknown" ]; then
+        echo "Local image size: $image_size"
+    fi
+fi
+echo ""
+read -p "Delete local container image {image_tag}? (y/n) " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    podman rmi {image_tag} 2>/dev/null
+    if [ $? -eq 0 ]; then
+        echo "✅ Local container image deleted"
+    else
+        echo "⚠️  Could not delete image (may not exist locally)"
+    fi
+else
+    echo "Keeping local container image"
+fi
+
+# Offer to delete models directory
+echo ""
+if [ -d "./models" ]; then
+    if command -v du &> /dev/null; then
+        models_size=$(du -sh ./models 2>/dev/null | cut -f1 || echo "unknown")
+        echo "Models directory size: $models_size"
+    fi
+    echo ""
+    read -p "Delete models/ directory to reclaim disk space? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        rm -rf ./models
+        echo "✅ models/ directory deleted"
+        echo ""
+        echo "💡 Note: To rebuild, you'll need to run ./download.sh again"
+    else
+        echo "Keeping models/ directory"
+        echo "💡 Tip: You can delete it later by running ./cleanup.sh"
+    fi
+fi
+
+echo ""
+echo "=========================================="
 echo "Deployment in OpenShift AI:"
 echo "  - Model name: {image_tag.split(':')[1] if ':' in image_tag else image_tag}"
 echo "  - Runtime: vLLM ServingRuntime"
 echo "  - Source type: OCI - v1"
 echo "  - URI: oci://{quay_uri}"
+echo "=========================================="
 """
 
 
@@ -185,6 +236,78 @@ rm -rf ./models
 echo "✅ models/ directory deleted"
 echo ""
 echo "To rebuild the container image, you'll need to run ./download.sh again"
+"""
+
+
+def generate_cleanup_old_images_script() -> str:
+    """Generate cleanup-old-images.sh script for removing old ModelCar images."""
+    return """#!/bin/bash
+
+echo "=========================================="
+echo "ModelCar Image Cleanup"
+echo "=========================================="
+echo ""
+echo "This will remove old ModelCar container images (models:*) from Podman."
+echo "This is safe and only affects ModelCar builds - other images are preserved."
+echo ""
+
+# Check if podman is available
+if ! command -v podman &> /dev/null; then
+    echo "❌ Error: podman not found"
+    exit 1
+fi
+
+# Check for ModelCar images
+echo "Looking for ModelCar images (models:*)..."
+echo ""
+
+images=$(podman images --filter "reference=models:*" --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>/dev/null)
+
+if [ -z "$images" ]; then
+    echo "✅ No ModelCar images found - nothing to clean up"
+    echo ""
+    echo "💡 Tip: ModelCar images are tagged as 'models:*'"
+    exit 0
+fi
+
+# Display images that will be deleted
+echo "The following ModelCar images will be deleted:"
+echo ""
+echo "$images"
+echo ""
+
+# Calculate total size
+total_size=$(podman images --filter "reference=models:*" --format "{{.Size}}" 2>/dev/null | \
+    awk '{sum+=$1} END {printf "%.1f GB", sum}')
+
+echo "Total space to reclaim: approximately $total_size"
+echo ""
+
+# Confirm deletion
+read -p "Delete these images? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Cleanup cancelled"
+    exit 0
+fi
+
+# Delete images
+echo ""
+echo "Deleting ModelCar images..."
+podman rmi $(podman images --filter "reference=models:*" -q) 2>/dev/null
+
+if [ $? -eq 0 ]; then
+    echo "✅ ModelCar images deleted successfully"
+    echo ""
+    echo "💡 To reclaim storage immediately, run:"
+    echo "   podman system prune"
+else
+    echo "⚠️  Some images could not be deleted (may be in use)"
+    echo ""
+    echo "💡 If images are in use, stop containers first:"
+    echo "   podman ps -a"
+    echo "   podman stop <container-id>"
+fi
 """
 
 
@@ -266,17 +389,44 @@ This script will:
 - Warn about disk space requirements
 - Build the container image with Podman
 - Push the image to your Quay registry
+- **Offer to delete the local container image** (saves multi-GB)
+- **Offer to delete the models/ directory** (saves even more space)
 
 The build uses `--platform linux/amd64` for OpenShift compatibility.
 
-### 3. Clean Up (Optional)
+**After successful push**, the script will prompt you to:
+1. Delete the local container image (no longer needed since it's in the registry)
+2. Delete the models/ directory (frees up significant disk space)
+
+You can decline these prompts if you want to keep the files locally.
+
+### 3. Manual Cleanup (Alternative)
+
+If you skipped the automatic cleanup prompts, you can run:
 
 ```bash
 chmod +x cleanup.sh
 ./cleanup.sh
 ```
 
-This deletes the local `models/` directory to reclaim disk space. The model is safely stored in your container registry.
+This script deletes the local `models/` directory to reclaim disk space. The model is safely stored in your container registry.
+
+### 4. Cleanup Old ModelCar Images
+
+Over time, building multiple ModelCar projects can consume significant Podman storage space. To safely remove old ModelCar images without affecting other containers:
+
+```bash
+chmod +x cleanup-old-images.sh
+./cleanup-old-images.sh
+```
+
+This script:
+- **Only removes ModelCar images** (tagged as `models:*`)
+- Shows you exactly what will be deleted before proceeding
+- Preserves all other Podman images and containers
+- Displays total space that will be reclaimed
+
+This is much safer than `podman system prune` which removes all unused images.
 
 ## Container Details
 
@@ -320,6 +470,7 @@ serving.knative.dev/progress-deadline: 30m
 | `download.sh` | Downloads model from HuggingFace |
 | `build-and-push.sh` | Builds and pushes container image |
 | `cleanup.sh` | Deletes local model files |
+| `cleanup-old-images.sh` | Removes old ModelCar images from Podman |
 | `download_model.py` | Python script called by download.sh |
 | `Containerfile` | Container build instructions |
 | `requirements.txt` | Python dependencies for downloading |
@@ -341,6 +492,12 @@ serving.knative.dev/progress-deadline: 30m
 - Verify you're logged into Quay: `podman login quay.io`
 - Check repository permissions
 - Ensure repository exists in Quay
+
+**Podman storage space issues:**
+- If you get "no space left on device" errors, check Podman storage: `podman system df`
+- Run `./cleanup-old-images.sh` to remove old ModelCar images safely
+- For more aggressive cleanup: `podman system prune` (removes all unused images)
+- Podman storage is typically in `/var/tmp` which may have different space than main disk
 
 ## Additional Resources
 
@@ -394,13 +551,27 @@ def model_car(hf_repo: str, quay_uri: str, target_dir: str | None):
 
         console.print(f"[green]✓[/green] Container registry URI: {quay_uri}")
 
-        # Step 3: Derive project name from model name
+        # Step 3: Check registry login
+        registry = components["registry"]
+        is_logged_in, login_info = check_registry_login(registry)
+        if not is_logged_in:
+            console.print(f"[red]✗[/red] Not logged into {registry}")
+            console.print(f"\n[yellow]Error:[/yellow] {login_info}")
+            console.print(
+                f"\n[yellow]Hint:[/yellow] Login to the registry first:\n"
+                f"  [dim]podman login {registry}[/dim]"
+            )
+            sys.exit(1)
+
+        console.print(f"[green]✓[/green] Logged into {registry} as {login_info}")
+
+        # Step 4: Derive project name from model name
         project_name = derive_project_name(hf_repo_id)
         model_name = hf_repo_id.split("/")[-1]  # Keep original case for display
 
         console.print(f"[green]✓[/green] Project directory: {project_name}")
 
-        # Step 4: Resolve and validate target directory
+        # Step 5: Resolve and validate target directory
         target_path = resolve_target_path(project_name, target_dir)
 
         is_valid, error_msg = validate_target_directory(target_path, allow_existing=False)
@@ -413,7 +584,7 @@ def model_car(hf_repo: str, quay_uri: str, target_dir: str | None):
 
         console.print(f"[green]✓[/green] Target path: {target_path}")
 
-        # Step 5: Create project directory structure
+        # Step 6: Create project directory structure
         console.print("\n[cyan]Creating project structure...[/cyan]")
 
         target_path.mkdir(parents=True, exist_ok=True)
@@ -423,7 +594,7 @@ def model_car(hf_repo: str, quay_uri: str, target_dir: str | None):
         # Generate image tag (use just the tag part from quay_uri)
         image_tag = f"models:{components['tag']}"
 
-        # Step 6: Generate all files
+        # Step 7: Generate all files
         # Generate download_model.py content separately
         download_py_content = f"""from huggingface_hub import snapshot_download
 
@@ -449,6 +620,7 @@ print("Next step: Run ./build-and-push.sh to build and push the container")
             "Containerfile": generate_containerfile(),
             "build-and-push.sh": generate_build_script(image_tag, quay_uri),
             "cleanup.sh": generate_cleanup_script(),
+            "cleanup-old-images.sh": generate_cleanup_old_images_script(),
             "requirements.txt": generate_requirements(),
             ".gitignore": generate_gitignore(),
             "README.md": generate_readme(hf_repo_id, model_name, image_tag, quay_uri),
@@ -464,7 +636,7 @@ print("Next step: Run ./build-and-push.sh to build and push the container")
 
             console.print(f"  [green]✓[/green] Created {filename}")
 
-        # Step 7: Success message with instructions
+        # Step 8: Success message with instructions
         success_message = f"""
 [bold green]✓ ModelCar project created successfully![/bold green]
 
@@ -484,9 +656,8 @@ print("Next step: Run ./build-and-push.sh to build and push the container")
 
   3. Build and push the container:
      [dim]./build-and-push.sh[/dim]
-
-  4. (Optional) Clean up local files:
-     [dim]./cleanup.sh[/dim]
+     [dim]• Will prompt to delete local image after push[/dim]
+     [dim]• Will prompt to delete models/ directory[/dim]
 
 [bold cyan]Deployment:[/bold cyan]
   Deploy in OpenShift AI using:

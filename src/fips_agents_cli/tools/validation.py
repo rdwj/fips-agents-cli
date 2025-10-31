@@ -270,6 +270,7 @@ def validate_quay_uri(uri: str) -> tuple[bool, str, dict[str, str]]:
     Validate Quay container registry URI with tag.
 
     Expected format: registry.com/org/repo:tag
+    Optionally accepts: https://registry.com/org/repo:tag
 
     Args:
         uri: Quay container registry URI
@@ -283,9 +284,17 @@ def validate_quay_uri(uri: str) -> tuple[bool, str, dict[str, str]]:
     Examples:
         >>> validate_quay_uri("quay.io/wjackson/models:granite-3.1-2b")
         (True, '', {'registry': 'quay.io', 'repo': 'wjackson/models', 'tag': 'granite-3.1-2b'})
+        >>> validate_quay_uri("https://quay.io/wjackson/models:granite-3.1-2b")
+        (True, '', {'registry': 'quay.io', 'repo': 'wjackson/models', 'tag': 'granite-3.1-2b'})
         >>> validate_quay_uri("quay.io/wjackson/models")
         (False, 'Missing tag...', {})
     """
+    # Strip protocol if present
+    if uri.startswith("https://"):
+        uri = uri[8:]  # Remove "https://"
+    elif uri.startswith("http://"):
+        uri = uri[7:]  # Remove "http://"
+
     # Check for tag
     if ":" not in uri:
         return (
@@ -352,3 +361,53 @@ def validate_quay_uri(uri: str) -> tuple[bool, str, dict[str, str]]:
         )
 
     return True, "", {"registry": registry, "repo": repo, "tag": tag}
+
+
+def check_registry_login(registry: str) -> tuple[bool, str]:
+    """
+    Check if user is logged into a container registry.
+
+    Uses `podman login --get-login` to check authentication status.
+
+    Args:
+        registry: Registry domain (e.g., 'quay.io')
+
+    Returns:
+        tuple: (is_logged_in, username_or_error)
+               is_logged_in is True if authenticated, False otherwise
+               username_or_error is the username if logged in, error message otherwise
+
+    Examples:
+        >>> check_registry_login("quay.io")
+        (True, 'myusername')
+        >>> check_registry_login("notloggedin.io")
+        (False, 'Not logged in')
+    """
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["podman", "login", "--get-login", registry],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode == 0:
+            username = result.stdout.strip()
+            if username:
+                return True, username
+            else:
+                return False, "Not logged in to registry"
+        else:
+            # Check if podman is not installed
+            if "command not found" in result.stderr.lower() or "not found" in result.stderr.lower():
+                return False, "Podman not installed"
+            return False, "Not logged in to registry"
+
+    except subprocess.TimeoutExpired:
+        return False, "Registry check timed out"
+    except FileNotFoundError:
+        return False, "Podman not installed"
+    except Exception as e:
+        return False, f"Error checking login: {str(e)}"

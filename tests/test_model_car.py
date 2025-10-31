@@ -1,5 +1,7 @@
 """Tests for the model-car command."""
 
+from unittest.mock import patch
+
 from fips_agents_cli.cli import cli
 
 
@@ -25,6 +27,7 @@ class TestCreateModelCar:
 
         assert result.exit_code == 0
         assert "ModelCar project created successfully" in result.output
+        assert "Logged into quay.io as testuser" in result.output
 
         # Check project directory was created with lowercase name
         project_dir = temp_dir / "granite-3.1-2b-instruct"
@@ -36,6 +39,7 @@ class TestCreateModelCar:
         assert (project_dir / "Containerfile").exists()
         assert (project_dir / "build-and-push.sh").exists()
         assert (project_dir / "cleanup.sh").exists()
+        assert (project_dir / "cleanup-old-images.sh").exists()
         assert (project_dir / "requirements.txt").exists()
         assert (project_dir / ".gitignore").exists()
         assert (project_dir / "README.md").exists()
@@ -46,6 +50,7 @@ class TestCreateModelCar:
         assert (project_dir / "download.sh").stat().st_mode & 0o111
         assert (project_dir / "build-and-push.sh").stat().st_mode & 0o111
         assert (project_dir / "cleanup.sh").stat().st_mode & 0o111
+        assert (project_dir / "cleanup-old-images.sh").stat().st_mode & 0o111
 
     def test_successful_creation_with_repo_id(self, cli_runner, temp_dir):
         """Test successful project creation with HuggingFace repo ID."""
@@ -61,6 +66,40 @@ class TestCreateModelCar:
 
         project_dir = temp_dir / "granite-3.1-2b-instruct"
         assert project_dir.exists()
+
+    def test_quay_uri_with_https_protocol(self, cli_runner, temp_dir):
+        """Test that Quay URI with https:// protocol is accepted."""
+        hf_repo = "ibm-granite/granite-3.1-2b-instruct"
+        quay_uri = "https://quay.io/wjackson/models:granite-3.1-2b-instruct"
+
+        result = cli_runner.invoke(
+            cli, ["create", "model-car", hf_repo, quay_uri, "--target-dir", str(temp_dir)]
+        )
+
+        assert result.exit_code == 0
+        assert "ModelCar project created successfully" in result.output
+        assert "Logged into quay.io as testuser" in result.output
+
+        project_dir = temp_dir / "granite-3.1-2b-instruct"
+        assert project_dir.exists()
+
+    def test_not_logged_into_registry(self, cli_runner, temp_dir):
+        """Test that not being logged into registry shows error."""
+        hf_repo = "ibm-granite/granite-3.1-2b-instruct"
+        quay_uri = "quay.io/wjackson/models:granite-3.1-2b-instruct"
+
+        # Override the auto-use fixture for this specific test
+        with patch(
+            "fips_agents_cli.commands.model_car.check_registry_login",
+            return_value=(False, "Not logged in to registry"),
+        ):
+            result = cli_runner.invoke(
+                cli, ["create", "model-car", hf_repo, quay_uri, "--target-dir", str(temp_dir)]
+            )
+
+        assert result.exit_code == 1
+        assert "Not logged into quay.io" in result.output
+        assert "podman login quay.io" in result.output
 
     def test_mixed_case_model_name(self, cli_runner, temp_dir):
         """Test that mixed case model names are converted to lowercase for directory."""
@@ -233,6 +272,31 @@ class TestCreateModelCar:
         assert "rm -rf ./models" in cleanup_script
         assert "Delete models/" in cleanup_script
 
+    def test_cleanup_old_images_script(self, cli_runner, temp_dir):
+        """Test that cleanup-old-images.sh script is created with correct content."""
+        hf_repo = "ibm-granite/granite-3.1-2b-instruct"
+        quay_uri = "quay.io/wjackson/models:granite-3.1-2b-instruct"
+
+        result = cli_runner.invoke(
+            cli, ["create", "model-car", hf_repo, quay_uri, "--target-dir", str(temp_dir)]
+        )
+
+        assert result.exit_code == 0
+        project_dir = temp_dir / "granite-3.1-2b-instruct"
+
+        # Check file exists and is executable
+        cleanup_old_images = project_dir / "cleanup-old-images.sh"
+        assert cleanup_old_images.exists()
+        assert cleanup_old_images.stat().st_mode & 0o111
+
+        # Check content
+        script_content = cleanup_old_images.read_text()
+        assert "#!/bin/bash" in script_content
+        assert "ModelCar Image Cleanup" in script_content
+        assert 'podman images --filter "reference=models:*"' in script_content
+        assert "Only removes ModelCar" in script_content or "models:*" in script_content
+        assert "podman rmi" in script_content
+
     def test_requirements_contains_huggingface_hub(self, cli_runner, temp_dir):
         """Test that requirements.txt contains huggingface-hub."""
         hf_repo = "ibm-granite/granite-3.1-2b-instruct"
@@ -248,6 +312,24 @@ class TestCreateModelCar:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "huggingface-hub" in requirements
 
+    def test_build_script_includes_cleanup_prompts(self, cli_runner, temp_dir):
+        """Test that build script includes cleanup prompts."""
+        hf_repo = "ibm-granite/granite-3.1-2b-instruct"
+        quay_uri = "quay.io/wjackson/models:granite-3.1-2b-instruct"
+
+        result = cli_runner.invoke(
+            cli, ["create", "model-car", hf_repo, quay_uri, "--target-dir", str(temp_dir)]
+        )
+
+        assert result.exit_code == 0
+        project_dir = temp_dir / "granite-3.1-2b-instruct"
+
+        build_script = (project_dir / "build-and-push.sh").read_text()
+        assert "Delete local container image" in build_script
+        assert "Delete models/ directory to reclaim disk space" in build_script
+        assert "podman rmi" in build_script
+        assert "Cleanup Options" in build_script
+
     def test_success_message_instructions(self, cli_runner, temp_dir):
         """Test that success message contains proper instructions."""
         hf_repo = "ibm-granite/granite-3.1-2b-instruct"
@@ -260,7 +342,8 @@ class TestCreateModelCar:
         assert result.exit_code == 0
         assert "./download.sh" in result.output
         assert "./build-and-push.sh" in result.output
-        assert "./cleanup.sh" in result.output
+        assert "Will prompt to delete local image after push" in result.output
+        assert "Will prompt to delete models/ directory" in result.output
         assert "Do NOT commit" in result.output
         assert "oci://" in result.output
 

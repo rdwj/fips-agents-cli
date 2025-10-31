@@ -2,6 +2,7 @@
 
 import tempfile
 from pathlib import Path
+from unittest.mock import patch
 
 import pytest
 from click.testing import CliRunner
@@ -60,3 +61,13 @@ mcp-server-template = "mcp_server_template.server:main"
 def sample_project_name():
     """Provide a valid sample project name."""
     return "test-mcp-server"
+
+
+@pytest.fixture(autouse=True)
+def mock_registry_login():
+    """Mock registry login check for model-car tests."""
+    with patch(
+        "fips_agents_cli.commands.model_car.check_registry_login",
+        return_value=(True, "testuser"),
+    ):
+        yield
