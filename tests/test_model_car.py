@@ -42,6 +42,7 @@ class TestCreateModelCar:
         assert (project_dir / "cleanup-old-images.sh").exists()
         assert (project_dir / "requirements.txt").exists()
         assert (project_dir / ".gitignore").exists()
+        assert (project_dir / ".template-info").exists()
         assert (project_dir / "README.md").exists()
         assert (project_dir / "models").exists()
         assert (project_dir / "models").is_dir()
@@ -314,6 +315,48 @@ class TestCreateModelCar:
 
         requirements = (project_dir / "requirements.txt").read_text()
         assert "huggingface-hub" in requirements
+
+    def test_template_info_file_created(self, cli_runner, temp_dir):
+        """Test that .template-info file is created with correct metadata."""
+        import json
+
+        hf_repo = "ibm-granite/granite-3.1-2b-instruct"
+        quay_uri = "quay.io/wjackson/models:granite-3.1-2b-instruct"
+
+        result = cli_runner.invoke(
+            cli, ["create", "model-car", hf_repo, quay_uri, "--target-dir", str(temp_dir)]
+        )
+
+        assert result.exit_code == 0
+        project_dir = temp_dir / "granite-3.1-2b-instruct"
+
+        # Check file exists
+        template_info_file = project_dir / ".template-info"
+        assert template_info_file.exists()
+
+        # Check content
+        with open(template_info_file) as f:
+            info = json.load(f)
+
+        # Verify structure and content
+        assert "generator" in info
+        assert info["generator"]["tool"] == "fips-agents-cli"
+        assert info["generator"]["command"] == "create model-car"
+        assert "version" in info["generator"]
+
+        assert "source" in info
+        assert info["source"]["type"] == "huggingface"
+        assert info["source"]["repository"] == hf_repo
+        assert info["source"]["url"] == f"https://huggingface.co/{hf_repo}"
+
+        assert "destination" in info
+        assert info["destination"]["type"] == "container-registry"
+        assert info["destination"]["uri"] == quay_uri
+        assert info["destination"]["registry"] == "quay.io"
+
+        assert "project" in info
+        assert info["project"]["name"] == "granite-3.1-2b-instruct"
+        assert "created_at" in info["project"]
 
     def test_build_script_includes_cleanup_prompts(self, cli_runner, temp_dir):
         """Test that build script includes cleanup prompts."""

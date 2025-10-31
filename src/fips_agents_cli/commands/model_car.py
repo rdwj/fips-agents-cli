@@ -1,6 +1,8 @@
 """Create command for generating ModelCar container projects."""
 
+import json
 import sys
+from datetime import datetime, timezone
 
 import click
 from rich.console import Console
@@ -12,6 +14,7 @@ from fips_agents_cli.tools.validation import (
     parse_huggingface_repo,
     validate_quay_uri,
 )
+from fips_agents_cli.version import __version__
 
 console = Console()
 
@@ -533,6 +536,56 @@ serving.knative.dev/progress-deadline: 30m
 """
 
 
+def write_modelcar_info(
+    project_path,
+    hf_repo_id: str,
+    quay_uri: str,
+    project_name: str,
+) -> None:
+    """
+    Write ModelCar generation metadata to .template-info file.
+
+    Args:
+        project_path: Path to the project root directory
+        hf_repo_id: HuggingFace repository ID (e.g., openai/gpt-oss-20b)
+        quay_uri: Full Quay container registry URI with tag
+        project_name: Name of the generated project directory
+    """
+    try:
+        modelcar_info = {
+            "generator": {
+                "tool": "fips-agents-cli",
+                "version": __version__,
+                "command": "create model-car",
+            },
+            "source": {
+                "type": "huggingface",
+                "repository": hf_repo_id,
+                "url": f"https://huggingface.co/{hf_repo_id}",
+            },
+            "destination": {
+                "type": "container-registry",
+                "uri": quay_uri,
+                "registry": quay_uri.split("/")[0] if "/" in quay_uri else quay_uri,
+            },
+            "project": {
+                "name": project_name,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+            },
+        }
+
+        info_file = project_path / ".template-info"
+        with open(info_file, "w") as f:
+            json.dump(modelcar_info, f, indent=2)
+            f.write("\n")  # Add trailing newline
+
+        console.print("[green]✓[/green] Created project metadata file")
+
+    except Exception as e:
+        # Don't fail the entire operation if this fails
+        console.print(f"[yellow]⚠[/yellow] Could not write project info: {e}")
+
+
 @click.command("model-car")
 @click.argument("hf_repo")
 @click.argument("quay_uri")
@@ -660,6 +713,9 @@ print("Next step: Run ./build-and-push.sh to build and push the container")
                 file_path.chmod(0o755)
 
             console.print(f"  [green]✓[/green] Created {filename}")
+
+        # Write project metadata
+        write_modelcar_info(target_path, hf_repo_id, quay_uri, project_name)
 
         # Step 8: Success message with instructions
         success_message = f"""
