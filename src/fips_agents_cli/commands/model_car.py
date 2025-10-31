@@ -43,27 +43,52 @@ def derive_project_name(hf_repo_id: str) -> str:
 
 
 def generate_download_script(hf_repo_id: str) -> str:
-    """Generate download_model.py script content."""
-    return f'''#!/usr/bin/env python3
-"""Download model from HuggingFace."""
+    """Generate download.sh bash wrapper script."""
+    return f"""#!/bin/bash
+set -e  # Exit on error
 
-from huggingface_hub import snapshot_download
+echo "=========================================="
+echo "ModelCar Download Script"
+echo "=========================================="
+echo ""
+echo "Downloading model: {hf_repo_id}"
+echo ""
 
-# Specify the Hugging Face repository containing the model
-model_repo = "{hf_repo_id}"
+# Check if Python 3 is installed
+if ! command -v python3 &> /dev/null; then
+    echo "❌ Error: python3 not found"
+    echo "Please install Python 3 to continue"
+    exit 1
+fi
 
-print(f"Downloading model from {{model_repo}}...")
-print("This may take a while depending on model size and network speed.")
+# Create virtual environment if it doesn't exist
+if [ ! -d "venv" ]; then
+    echo "Creating Python virtual environment..."
+    python3 -m venv venv
+    echo "✅ Virtual environment created"
+    echo ""
+fi
 
-snapshot_download(
-    repo_id=model_repo,
-    local_dir="./models",
-    allow_patterns=["*.safetensors", "*.json", "*.txt", "*.md"],
-)
+# Activate virtual environment
+echo "Activating virtual environment..."
+source venv/bin/activate
 
-print("✅ Model downloaded successfully to ./models")
-print("Next step: Run ./build-and-push.sh to build and push the container")
-'''
+# Install requirements
+echo "Installing dependencies..."
+pip install -q -r requirements.txt
+
+# Run the download script
+echo ""
+echo "Starting model download..."
+echo "This may take a while depending on model size and network speed."
+echo ""
+python3 download_model.py
+
+echo ""
+echo "✅ Download complete!"
+echo ""
+echo "Next step: Run ./build-and-push.sh to build and push the container"
+"""
 
 
 def generate_containerfile() -> str:

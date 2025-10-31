@@ -241,7 +241,7 @@ class TestCreateModelCar:
         assert "already exists" in result.output
 
     def test_download_script_instructions(self, cli_runner, temp_dir):
-        """Test that download.sh script has proper instructions."""
+        """Test that download.sh is a bash wrapper script."""
         hf_repo = "ibm-granite/granite-3.1-2b-instruct"
         quay_uri = "quay.io/wjackson/models:granite-3.1-2b-instruct"
 
@@ -253,8 +253,11 @@ class TestCreateModelCar:
         project_dir = temp_dir / "granite-3.1-2b-instruct"
 
         download_script = (project_dir / "download.sh").read_text()
-        assert "#!/usr/bin/env python3" in download_script
-        assert "python" in download_script or "python3" in download_script
+        assert "#!/bin/bash" in download_script
+        assert "python3 -m venv venv" in download_script
+        assert "source venv/bin/activate" in download_script
+        assert "pip install" in download_script
+        assert "python3 download_model.py" in download_script
 
     def test_cleanup_script_functionality(self, cli_runner, temp_dir):
         """Test that cleanup.sh script has proper functionality."""
