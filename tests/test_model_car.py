@@ -136,7 +136,7 @@ class TestCreateModelCar:
         # Check Containerfile
         containerfile = (project_dir / "Containerfile").read_text()
         assert "ubi-micro" in containerfile
-        assert "COPY /models /models" in containerfile
+        assert "COPY models /models" in containerfile
 
         # Check build-and-push.sh contains correct URIs
         build_script = (project_dir / "build-and-push.sh").read_text()

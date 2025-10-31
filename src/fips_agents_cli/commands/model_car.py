@@ -102,7 +102,7 @@ def generate_containerfile() -> str:
 FROM registry.access.redhat.com/ubi9/ubi-micro:9.4
 
 # Copy the model files from the local models directory
-COPY /models /models
+COPY models /models
 
 # Run as non-root user
 USER 1001
@@ -685,7 +685,6 @@ print("This may take a while depending on model size and network speed.")
 snapshot_download(
     repo_id=model_repo,
     local_dir="./models",
-    allow_patterns=["*.safetensors", "*.json", "*.txt", "*.md"],
 )
 
 print("✅ Model downloaded successfully to ./models")
