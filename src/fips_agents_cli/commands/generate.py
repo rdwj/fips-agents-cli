@@ -234,9 +234,7 @@ def generate_component_workflow(
             # Create __init__.py if it doesn't exist
             init_file = src_subdir / "__init__.py"
             if not init_file.exists():
-                init_file.write_text(
-                    f'"""{subdir.replace("_", " ").title()} package."""\n'
-                )
+                init_file.write_text(f'"""{subdir.replace("_", " ").title()} package."""\n')
                 console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
 
         # Create subdirectories in tests/
@@ -248,9 +246,7 @@ def generate_component_workflow(
             # Create __init__.py if it doesn't exist
             init_file = test_subdir / "__init__.py"
             if not init_file.exists():
-                init_file.write_text(
-                    f'"""{subdir.replace("_", " ").title()} tests."""\n'
-                )
+                init_file.write_text(f'"""{subdir.replace("_", " ").title()} tests."""\n')
                 console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
 
     # Step 13: Write files
