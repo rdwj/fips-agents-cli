@@ -495,6 +495,16 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.8
+
+- Feature: Added GitHub Copilot agent template support
+- Feature: Added `model-car` command for creating model car projects
+- Fix: Subdirectory names now convert hyphens to underscores for valid Python package names
+- Fix: Added `module_path` template variable for proper import paths in subdirectory components
+- Fix: Script generator improvements
+- Improvement: Removed download filter for cleaner template handling
+- Improvement: Added info file tracking for generated projects
+
 ### Version 0.1.7
 
 - **Critical Fix**: Resource generator now automatically extracts URI template parameters (e.g., `{country_code}`, `{id}`) and adds them to function signature
