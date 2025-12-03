@@ -115,6 +115,14 @@ def generate_component_workflow(
     template_vars["description"] = description
     template_vars["component_name"] = component_name
 
+    # Build the full module path for imports (e.g., "country_profiles.japan" or just "japan")
+    # Convert hyphens to underscores for valid Python module names
+    if subdirs:
+        subdir_parts = [s.replace("-", "_") for s in subdirs]
+        template_vars["module_path"] = ".".join(subdir_parts + [component_name])
+    else:
+        template_vars["module_path"] = component_name
+
     # Step 6: Load params file if provided
     if params_path:
         try:
@@ -154,8 +162,9 @@ def generate_component_workflow(
 
     # Handle subdirectories
     if subdirs:
-        # Create subdirectory path
-        subdir_path = Path(*subdirs)
+        # Create subdirectory path (convert hyphens to underscores for valid Python package names)
+        subdir_parts_normalized = [s.replace("-", "_") for s in subdirs]
+        subdir_path = Path(*subdir_parts_normalized)
         component_file = component_base / subdir_path / f"{component_name}.py"
         test_file = test_base / subdir_path / f"test_{component_name}.py"
     else:
@@ -213,9 +222,12 @@ def generate_component_workflow(
 
     # Step 12: Create subdirectories and __init__.py files if needed
     if subdirs:
+        # Normalize subdirectory names (convert hyphens to underscores)
+        subdirs_normalized = [s.replace("-", "_") for s in subdirs]
+
         # Create subdirectories in src/
         src_subdir = component_base
-        for subdir in subdirs:
+        for subdir in subdirs_normalized:
             src_subdir = src_subdir / subdir
             src_subdir.mkdir(parents=True, exist_ok=True)
 
@@ -223,13 +235,13 @@ def generate_component_workflow(
             init_file = src_subdir / "__init__.py"
             if not init_file.exists():
                 init_file.write_text(
-                    f'"""{subdir.replace("_", " ").replace("-", " ").title()} package."""\n'
+                    f'"""{subdir.replace("_", " ").title()} package."""\n'
                 )
                 console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
 
         # Create subdirectories in tests/
         test_subdir = test_base
-        for subdir in subdirs:
+        for subdir in subdirs_normalized:
             test_subdir = test_subdir / subdir
             test_subdir.mkdir(parents=True, exist_ok=True)
 
@@ -237,7 +249,7 @@ def generate_component_workflow(
             init_file = test_subdir / "__init__.py"
             if not init_file.exists():
                 init_file.write_text(
-                    f'"""{subdir.replace("_", " ").replace("-", " ").title()} tests."""\n'
+                    f'"""{subdir.replace("_", " ").title()} tests."""\n'
                 )
                 console.print(f"[green]✓[/green] Created: {init_file.relative_to(project_root)}")
 
