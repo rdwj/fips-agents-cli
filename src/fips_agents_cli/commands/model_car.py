@@ -536,22 +536,85 @@ serving.knative.dev/progress-deadline: 30m
 """
 
 
+def generate_modelcar_claude_md(hf_repo_id: str, model_name: str, quay_uri: str) -> str:
+    """Generate CLAUDE.md content for ModelCar projects."""
+    return f"""# CLAUDE.md - ModelCar Project
+
+This file provides guidance to Claude Code when working with this ModelCar project.
+
+## Project Overview
+
+This is a **ModelCar** project for packaging the **{model_name}** model from HuggingFace
+into a container image for deployment on OpenShift AI.
+
+## Source Information
+
+- **HuggingFace Repository:** [{hf_repo_id}](https://huggingface.co/{hf_repo_id})
+- **Container Registry:** `{quay_uri}`
+
+## Important Notes
+
+1. **This is a temporary workspace** - do NOT commit model files to git
+2. **Source of truth:** The HuggingFace repository
+3. **Delete after use:** This directory should be deleted after pushing to registry
+
+## Workflow
+
+1. **Download:** `./download.sh` - Downloads model from HuggingFace
+2. **Build & Push:** `./build-and-push.sh` - Creates and pushes container image
+3. **Cleanup:** Delete this directory after successful push
+
+## Files
+
+| File | Purpose |
+|------|---------|
+| `download.sh` | Downloads model from HuggingFace |
+| `build-and-push.sh` | Builds container and pushes to registry |
+| `cleanup.sh` | Deletes local model files |
+| `cleanup-old-images.sh` | Removes old ModelCar images from Podman |
+| `Containerfile` | Container build instructions |
+
+## OpenShift AI Deployment
+
+Deploy using:
+- **Runtime:** vLLM ServingRuntime
+- **Source type:** OCI - v1
+- **URI:** `oci://{quay_uri}`
+
+## Generation Info
+
+This project was generated using `fips-agents create model-car`.
+See `.fips-agents-cli/info.json` for full generation metadata.
+"""
+
+
 def write_modelcar_info(
     project_path,
     hf_repo_id: str,
     quay_uri: str,
     project_name: str,
+    model_name: str,
 ) -> None:
     """
-    Write ModelCar generation metadata to .template-info file.
+    Write ModelCar generation metadata to .fips-agents-cli directory.
+
+    Creates:
+    - .fips-agents-cli/info.json - Generation metadata
+    - .fips-agents-cli/CLAUDE.md - Claude Code instructions
 
     Args:
         project_path: Path to the project root directory
         hf_repo_id: HuggingFace repository ID (e.g., openai/gpt-oss-20b)
         quay_uri: Full Quay container registry URI with tag
         project_name: Name of the generated project directory
+        model_name: Display name of the model
     """
     try:
+        # Create .fips-agents-cli directory
+        fips_dir = project_path / ".fips-agents-cli"
+        fips_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write info.json
         modelcar_info = {
             "generator": {
                 "tool": "fips-agents-cli",
@@ -574,12 +637,18 @@ def write_modelcar_info(
             },
         }
 
-        info_file = project_path / ".template-info"
+        info_file = fips_dir / "info.json"
         with open(info_file, "w") as f:
             json.dump(modelcar_info, f, indent=2)
             f.write("\n")  # Add trailing newline
 
-        console.print("[green]✓[/green] Created project metadata file")
+        # Write CLAUDE.md
+        claude_md_file = fips_dir / "CLAUDE.md"
+        claude_md_content = generate_modelcar_claude_md(hf_repo_id, model_name, quay_uri)
+        with open(claude_md_file, "w") as f:
+            f.write(claude_md_content)
+
+        console.print("[green]✓[/green] Created .fips-agents-cli/ with project metadata")
 
     except Exception as e:
         # Don't fail the entire operation if this fails
@@ -713,8 +782,8 @@ print("Next step: Run ./build-and-push.sh to build and push the container")
 
             console.print(f"  [green]✓[/green] Created {filename}")
 
-        # Write project metadata
-        write_modelcar_info(target_path, hf_repo_id, quay_uri, project_name)
+        # Write project metadata to .fips-agents-cli directory
+        write_modelcar_info(target_path, hf_repo_id, quay_uri, project_name, model_name)
 
         # Step 8: Success message with instructions
         success_message = f"""

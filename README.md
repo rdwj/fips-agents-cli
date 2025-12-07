@@ -495,6 +495,13 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.1.9
+
+- Feature: Added `.fips-agents-cli` directory to ModelCar projects with generation metadata
+- Feature: ModelCar projects now include `info.json` with source, destination, and generator info
+- Feature: ModelCar projects now include `CLAUDE.md` with project-specific Claude Code instructions
+- Improvement: Consistent project metadata structure between MCP server and ModelCar projects
+
 ### Version 0.1.8
 
 - Feature: Added GitHub Copilot agent template support

@@ -42,7 +42,9 @@ class TestCreateModelCar:
         assert (project_dir / "cleanup-old-images.sh").exists()
         assert (project_dir / "requirements.txt").exists()
         assert (project_dir / ".gitignore").exists()
-        assert (project_dir / ".template-info").exists()
+        assert (project_dir / ".fips-agents-cli").exists()
+        assert (project_dir / ".fips-agents-cli" / "info.json").exists()
+        assert (project_dir / ".fips-agents-cli" / "CLAUDE.md").exists()
         assert (project_dir / "README.md").exists()
         assert (project_dir / "models").exists()
         assert (project_dir / "models").is_dir()
@@ -316,8 +318,8 @@ class TestCreateModelCar:
         requirements = (project_dir / "requirements.txt").read_text()
         assert "huggingface-hub" in requirements
 
-    def test_template_info_file_created(self, cli_runner, temp_dir):
-        """Test that .template-info file is created with correct metadata."""
+    def test_fips_agents_cli_directory_created(self, cli_runner, temp_dir):
+        """Test that .fips-agents-cli directory is created with metadata and CLAUDE.md."""
         import json
 
         hf_repo = "ibm-granite/granite-3.1-2b-instruct"
@@ -330,12 +332,19 @@ class TestCreateModelCar:
         assert result.exit_code == 0
         project_dir = temp_dir / "granite-3.1-2b-instruct"
 
-        # Check file exists
-        template_info_file = project_dir / ".template-info"
-        assert template_info_file.exists()
+        # Check directory and files exist
+        fips_dir = project_dir / ".fips-agents-cli"
+        assert fips_dir.exists()
+        assert fips_dir.is_dir()
 
-        # Check content
-        with open(template_info_file) as f:
+        info_file = fips_dir / "info.json"
+        assert info_file.exists()
+
+        claude_md_file = fips_dir / "CLAUDE.md"
+        assert claude_md_file.exists()
+
+        # Check info.json content
+        with open(info_file) as f:
             info = json.load(f)
 
         # Verify structure and content
@@ -357,6 +366,15 @@ class TestCreateModelCar:
         assert "project" in info
         assert info["project"]["name"] == "granite-3.1-2b-instruct"
         assert "created_at" in info["project"]
+
+        # Check CLAUDE.md content
+        claude_md_content = claude_md_file.read_text()
+        assert "CLAUDE.md - ModelCar Project" in claude_md_content
+        assert hf_repo in claude_md_content
+        assert quay_uri in claude_md_content
+        assert "granite-3.1-2b-instruct" in claude_md_content
+        assert "temporary workspace" in claude_md_content
+        assert "OpenShift AI Deployment" in claude_md_content
 
     def test_build_script_includes_cleanup_prompts(self, cli_runner, temp_dir):
         """Test that build script includes cleanup prompts."""
