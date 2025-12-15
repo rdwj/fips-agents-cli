@@ -495,6 +495,22 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.2.0
+
+- Feature: GitHub integration for `create mcp-server` command
+- Feature: New `--github` flag to create GitHub repository and push code
+- Feature: New `--local` flag to skip GitHub and create local-only project
+- Feature: Non-interactive mode (`--yes`) for agent/CI workflows
+- Feature: New `--private` flag to create private GitHub repositories
+- Feature: New `--org` option to create repositories in GitHub organizations
+- Feature: New `--description` option for GitHub repository descriptions
+- Feature: New `--remote-only` flag to create GitHub repo without local clone
+- Feature: Added missing `patch build` subcommand for updating build/deployment files
+- Feature: GitHub metadata tracking in `.template-info` file
+- Feature: New git utilities for remote management (`add_remote`, `push_to_remote`)
+- Improvement: Auto-detects `gh` CLI and prompts user when available
+- Improvement: Clean git history - customizes project before initial push
+
 ### Version 0.1.9
 
 - Feature: Added `.fips-agents-cli` directory to ModelCar projects with generation metadata

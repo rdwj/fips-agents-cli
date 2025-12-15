@@ -119,6 +119,21 @@ def docs(dry_run: bool):
     _patch_category("docs", dry_run)
 
 
+@patch.command("build")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be updated without making changes",
+)
+def build(dry_run: bool):
+    """
+    Update build and deployment files (Makefile, Containerfile, etc).
+
+    Shows diffs and asks for confirmation before applying changes.
+    """
+    _patch_category("build", dry_run)
+
+
 @patch.command("all")
 @click.option(
     "--dry-run",

@@ -172,6 +172,8 @@ def write_template_info(
     project_name: str,
     template_url: str,
     template_commit: str,
+    github_repo: str | None = None,
+    github_url: str | None = None,
 ) -> None:
     """
     Write template generation metadata to .template-info file.
@@ -181,6 +183,8 @@ def write_template_info(
         project_name: Name of the generated project
         template_url: URL of the template repository
         template_commit: Git commit hash of the template
+        github_repo: GitHub repository in "owner/name" format (optional)
+        github_url: Full URL to the GitHub repository (optional)
     """
     try:
         template_info = {
@@ -195,6 +199,14 @@ def write_template_info(
                 "created_at": datetime.now(timezone.utc).isoformat(),
             },
         }
+
+        # Add GitHub metadata if provided
+        if github_repo or github_url:
+            template_info["github"] = {}
+            if github_repo:
+                template_info["github"]["repo"] = github_repo
+            if github_url:
+                template_info["github"]["url"] = github_url
 
         info_file = project_path / ".template-info"
         with open(info_file, "w") as f:
