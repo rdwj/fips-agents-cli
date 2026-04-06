@@ -68,7 +68,11 @@ class TestCreateMcpServer:
                 # Should pass validation (though may fail on other steps in isolation)
                 assert "Invalid project name" not in result.output
 
-    def test_existing_directory_error(self, cli_runner, temp_dir):
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=False)
+    @patch("fips_agents_cli.commands.create.is_git_installed", return_value=True)
+    def test_existing_directory_error(
+        self, mock_is_git_installed, mock_is_gh_installed, cli_runner, temp_dir
+    ):
         """Test that existing directory causes an error."""
         existing_dir = temp_dir / "existing-project"
         existing_dir.mkdir()
@@ -79,8 +83,11 @@ class TestCreateMcpServer:
         assert result.exit_code == 1
         assert "already exists" in result.output
 
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=False)
     @patch("fips_agents_cli.commands.create.is_git_installed")
-    def test_git_not_installed(self, mock_is_git_installed, cli_runner, temp_dir):
+    def test_git_not_installed(
+        self, mock_is_git_installed, mock_is_gh_installed, cli_runner, temp_dir
+    ):
         """Test that missing git installation is detected."""
         mock_is_git_installed.return_value = False
 
