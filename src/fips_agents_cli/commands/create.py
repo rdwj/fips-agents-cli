@@ -158,10 +158,7 @@ def mcp_server(
 
         console.print(f"[green]✓[/green] Project name '{project_name}' is valid")
 
-        # Step 3: Determine mode (GitHub or local)
-        create_github = _determine_github_mode(use_github, use_local, yes)
-
-        # Step 4: Check prerequisites
+        # Step 3: Check prerequisites (fail fast before any interactive prompts)
         if not is_git_installed():
             console.print(
                 "[yellow]⚠[/yellow] Git is not installed. This is required for cloning templates."
@@ -169,13 +166,7 @@ def mcp_server(
             console.print("[yellow]Hint:[/yellow] Install git from https://git-scm.com/downloads")
             sys.exit(1)
 
-        if create_github:
-            ready, error_msg = check_gh_prerequisites()
-            if not ready:
-                console.print(f"[red]✗[/red] {error_msg}")
-                sys.exit(1)
-
-        # Step 5: Resolve and validate target directory (skip for remote-only)
+        # Step 4: Resolve and validate target directory (skip for remote-only)
         target_path = None
         if not remote_only:
             target_path = resolve_target_path(project_name, target_dir)
@@ -190,6 +181,15 @@ def mcp_server(
                 sys.exit(1)
 
             console.print(f"[green]✓[/green] Target directory: {target_path}")
+
+        # Step 5: Determine mode (GitHub or local) — after precondition checks
+        create_github = _determine_github_mode(use_github, use_local, yes)
+
+        if create_github:
+            ready, error_msg = check_gh_prerequisites()
+            if not ready:
+                console.print(f"[red]✗[/red] {error_msg}")
+                sys.exit(1)
 
         # Step 6: Create GitHub repo first (if GitHub mode)
         github_repo = None

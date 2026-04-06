@@ -495,6 +495,11 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.2.1
+
+- Fix: Update CLI for FastMCP 3.x template compatibility (auth.py replaces loaders.py, updated prompt return types)
+- Fix: Reorder `create mcp-server` precondition checks to run before interactive GitHub prompt, so errors like missing git or existing directories fail fast without prompting first
+
 ### Version 0.2.0
 
 - Feature: GitHub integration for `create mcp-server` command
