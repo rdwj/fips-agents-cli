@@ -586,28 +586,48 @@ def prompt(
     default=True,
     help="Generate async or sync function (default: async)",
 )
+@click.option(
+    "--hook-type",
+    type=click.Choice(["before_tool", "after_tool", "on_error"]),
+    default=None,
+    help="Scaffold a specific hook pattern (default: general wrapper)",
+)
 @click.option("--description", "-d", help="Middleware description")
 @click.option("--dry-run", is_flag=True, help="Show what would be generated without creating files")
 def middleware(
     name: str,
     is_async: bool,
+    hook_type: str | None,
     description: str | None,
     dry_run: bool,
 ):
     """
-    Generate a new middleware component.
+    Generate a new middleware component using the v3.x class-based decorator pattern.
+
+    The generated middleware uses FastMCP's @mcp.middleware() decorator and receives
+    a Context and next_handler for wrapping tool execution.
 
     NAME is the middleware name in snake_case (e.g., auth_middleware, rate_limiter)
 
-    Example:
+    Examples:
+        # General-purpose wrapper (before + after + error handling)
         fips-agents generate middleware auth_middleware --description "Authentication middleware"
-        fips-agents generate middleware rate_limiter --sync
+
+        # Scaffold a before-tool hook
+        fips-agents generate middleware rate_limiter --hook-type before_tool
+
+        # Scaffold an after-tool hook (async)
+        fips-agents generate middleware audit_logger --hook-type after_tool
+
+        # Scaffold an error handler (sync)
+        fips-agents generate middleware error_reporter --hook-type on_error --sync
     """
     console.print("\n[bold cyan]Generating Middleware Component[/bold cyan]\n")
 
     template_vars = {
         "async": is_async,
-        "return_type": "None",  # Middleware typically doesn't return values
+        "hook_type": hook_type,
+        "return_type": "Any",  # Middleware returns the result of next_handler
     }
 
     generate_component_workflow("middleware", name, template_vars, None, dry_run, description)

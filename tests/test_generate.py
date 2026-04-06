@@ -303,7 +303,7 @@ class TestGenerateMiddlewareCommand:
     """Tests for generate middleware command."""
 
     def test_generate_middleware_basic(self, runner, mock_mcp_project):
-        """Test basic middleware generation."""
+        """Test basic middleware generation (general wrapper pattern)."""
         import os
 
         original_cwd = os.getcwd()
@@ -340,6 +340,59 @@ class TestGenerateMiddlewareCommand:
             )
 
             assert result.exit_code == 0
+
+        finally:
+            os.chdir(original_cwd)
+
+    @pytest.mark.parametrize("hook_type", ["before_tool", "after_tool", "on_error"])
+    def test_generate_middleware_hook_types(self, runner, mock_mcp_project, hook_type):
+        """Test middleware generation with each supported hook type."""
+        import os
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(mock_mcp_project)
+
+            result = runner.invoke(
+                generate,
+                [
+                    "middleware",
+                    f"{hook_type}_middleware",
+                    "--description",
+                    f"{hook_type} middleware",
+                    "--hook-type",
+                    hook_type,
+                ],
+                catch_exceptions=False,
+            )
+
+            assert (
+                result.exit_code == 0
+            ), f"Expected exit 0 for --hook-type {hook_type}, got: {result.output}"
+            assert (mock_mcp_project / "src" / "middleware" / f"{hook_type}_middleware.py").exists()
+
+        finally:
+            os.chdir(original_cwd)
+
+    def test_generate_middleware_invalid_hook_type(self, runner, mock_mcp_project):
+        """Test that an unrecognized hook type is rejected."""
+        import os
+
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(mock_mcp_project)
+
+            result = runner.invoke(
+                generate,
+                [
+                    "middleware",
+                    "bad_middleware",
+                    "--hook-type",
+                    "invalid_hook",
+                ],
+            )
+
+            assert result.exit_code != 0
 
         finally:
             os.chdir(original_cwd)
