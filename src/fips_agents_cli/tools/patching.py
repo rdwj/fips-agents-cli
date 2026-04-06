@@ -25,10 +25,10 @@ FILE_CATEGORIES = {
         "ask_before_patch": False,  # Safe to overwrite
     },
     "core": {
-        "description": "Core infrastructure (loaders, server, etc)",
+        "description": "Core infrastructure (server, auth, etc)",
         "patterns": [
-            "src/core/loaders.py",
             "src/core/server.py",
+            "src/core/auth.py",
             "src/*/__ init__.py",  # Package __init__ files
             "conftest.py",
         ],

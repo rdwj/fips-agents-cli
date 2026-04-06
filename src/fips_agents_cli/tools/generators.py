@@ -125,7 +125,7 @@ def validate_type_annotation(type_str: str) -> tuple[bool, str]:
         return (
             False,
             f"Bare '{type_str}' type not allowed. "
-            f"Use {type_str}[...] with type parameters for FastMCP 2.9.0+ compatibility",
+            f"Use {type_str}[...] with type parameters for FastMCP compatibility",
         )
 
     # Validate dict types have parameters
@@ -233,7 +233,7 @@ def load_params_file(params_path: Path) -> list[dict[str, Any]]:
             "list[int]",
             "list[float]",
             "list[bool]",
-            # Dict types (parameterized - REQUIRED for FastMCP 2.9.0+)
+            # Dict types (parameterized - REQUIRED for FastMCP)
             "dict[str, str]",
             "dict[str, Any]",
             "dict[str, int]",

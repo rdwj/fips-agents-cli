@@ -495,7 +495,7 @@ def resource(
 @click.option("--params", type=click.Path(exists=True), help="JSON file with parameter definitions")
 @click.option(
     "--return-type",
-    type=click.Choice(["str", "PromptMessage", "PromptResult", "list[PromptMessage]"]),
+    type=click.Choice(["str", "Message", "list[Message]"]),
     default="str",
     help="Return type annotation (default: str)",
 )
@@ -531,7 +531,7 @@ def prompt(
         fips-agents generate prompt code_review --description "Review code for best practices"
 
         # Async prompt with Context
-        fips-agents generate prompt fetch_data --async --with-context --return-type PromptMessage
+        fips-agents generate prompt fetch_data --async --with-context --return-type Message
 
         # Prompt with parameters and schema
         fips-agents generate prompt analyze_data --params params.json --with-schema
@@ -560,7 +560,7 @@ def prompt(
             sys.exit(1)
 
     # Determine if prompt imports are needed
-    needs_prompt_imports = return_type in ["PromptMessage", "PromptResult", "list[PromptMessage]"]
+    needs_prompt_imports = return_type in ["Message", "list[Message]"]
 
     template_vars = {
         "async": is_async,
