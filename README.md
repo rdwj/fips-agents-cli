@@ -495,6 +495,11 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.3.0
+
+- Feature: Added `--hook-type` option to middleware generator with `before_tool`, `after_tool`, and `on_error` choices for v3.x template scaffolding
+- Fix: Fixed brittle test mocking for GitHub CLI detection in create command tests
+
 ### Version 0.2.1
 
 - Fix: Update CLI for FastMCP 3.x template compatibility (auth.py replaces loaders.py, updated prompt return types)
