@@ -5,6 +5,7 @@ import tomlkit
 
 from fips_agents_cli.tools.project import (
     customize_agent_project,
+    customize_go_project,
     to_module_name,
     validate_project_name,
 )
@@ -190,3 +191,156 @@ class TestCustomizeAgentProject:
 
         pyproject = tomlkit.parse((project / "pyproject.toml").read_text())
         assert pyproject["project"]["name"] == "my-agent"
+
+
+class TestCustomizeGoProject:
+    """Tests for Go project customization."""
+
+    def _create_go_template(self, path, sentinel="gateway-template"):
+        """Create a minimal Go template structure for testing."""
+        path.mkdir(parents=True, exist_ok=True)
+
+        (path / "go.mod").write_text(
+            f"module github.com/redhat-ai-americas/{sentinel}\n\ngo 1.22\n"
+        )
+        (path / "Makefile").write_text(f"PROJECT     ?= {sentinel}\nIMAGE_NAME  ?= {sentinel}\n")
+        (path / "Containerfile").write_text(f'LABEL io.opencontainers.image.title="{sentinel}"\n')
+        (path / "README.md").write_text(f"# {sentinel}\n\nAn API gateway.\n")
+        (path / "CLAUDE.md").write_text(f"# {sentinel}\n\nDevelopment guide.\n")
+
+        chart = path / "chart"
+        chart.mkdir()
+        (chart / "Chart.yaml").write_text(f"name: {sentinel}\nversion: 0.1.0\n")
+        (chart / "values.yaml").write_text(f"image:\n  repository: {sentinel}\n")
+
+        templates = chart / "templates"
+        templates.mkdir()
+        (templates / "_helpers.tpl").write_text(
+            f'{{{{- define "{sentinel}.name" -}}}}\n{sentinel}\n{{{{- end }}}}\n'
+        )
+
+    def test_updates_go_mod(self, temp_dir):
+        """Test that go.mod module path is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "go.mod").read_text()
+        assert "my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_chart_name(self, temp_dir):
+        """Test that chart/Chart.yaml name is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "chart" / "Chart.yaml").read_text()
+        assert "name: my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_values_image(self, temp_dir):
+        """Test that chart/values.yaml image repository is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "chart" / "values.yaml").read_text()
+        assert "repository: my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_helpers_tpl(self, temp_dir):
+        """Test that chart/templates/_helpers.tpl is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "chart" / "templates" / "_helpers.tpl").read_text()
+        assert "my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_makefile(self, temp_dir):
+        """Test that Makefile PROJECT and IMAGE_NAME are updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "Makefile").read_text()
+        assert "IMAGE_NAME  ?= my-gateway" in content
+        assert "PROJECT     ?= my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_containerfile(self, temp_dir):
+        """Test that Containerfile image title label is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "Containerfile").read_text()
+        assert 'image.title="my-gateway"' in content
+        assert "gateway-template" not in content
+
+    def test_updates_readme(self, temp_dir):
+        """Test that README.md heading is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "README.md").read_text()
+        assert "# my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_claude_md(self, temp_dir):
+        """Test that CLAUDE.md heading is updated."""
+        project = temp_dir / "my-gateway"
+        self._create_go_template(project)
+
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "CLAUDE.md").read_text()
+        assert "# my-gateway" in content
+        assert "gateway-template" not in content
+
+    def test_updates_html_in_static(self, temp_dir):
+        """Test that HTML files in static/ directory are updated."""
+        project = temp_dir / "my-ui"
+        self._create_go_template(project, sentinel="ui-template")
+
+        static = project / "static"
+        static.mkdir()
+        (static / "index.html").write_text("<title>ui-template</title>\n")
+
+        customize_go_project(project, "my-ui", "ui-template")
+
+        content = (static / "index.html").read_text()
+        assert "<title>my-ui</title>" in content
+        assert "ui-template" not in content
+
+    def test_missing_go_mod_raises_error(self, temp_dir):
+        """Test that missing go.mod raises FileNotFoundError."""
+        project = temp_dir / "my-gateway"
+        project.mkdir()
+
+        with pytest.raises(FileNotFoundError):
+            customize_go_project(project, "my-gateway", "gateway-template")
+
+    def test_missing_optional_files_no_error(self, temp_dir):
+        """Test that missing optional files don't cause errors."""
+        project = temp_dir / "my-gateway"
+        project.mkdir()
+        # Only create go.mod — everything else is optional
+        (project / "go.mod").write_text("module gateway-template\n\ngo 1.22\n")
+
+        # Should not raise
+        customize_go_project(project, "my-gateway", "gateway-template")
+
+        content = (project / "go.mod").read_text()
+        assert "my-gateway" in content
+        assert "gateway-template" not in content

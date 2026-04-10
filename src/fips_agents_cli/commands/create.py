@@ -27,6 +27,7 @@ from fips_agents_cli.tools.github import (
 from fips_agents_cli.tools.project import (
     cleanup_template_files,
     customize_agent_project,
+    customize_go_project,
     to_module_name,
     update_project_name,
     validate_project_name,
@@ -40,6 +41,9 @@ MCP_SERVER_TEMPLATE_URL = "https://github.com/rdwj/mcp-server-template"
 
 AGENT_TEMPLATE_URL = "https://github.com/redhat-ai-americas/agent-template"
 AGENT_TEMPLATE_SUBDIR = "templates/agent-loop"
+
+GATEWAY_TEMPLATE_URL = "https://github.com/redhat-ai-americas/gateway-template"
+UI_TEMPLATE_URL = "https://github.com/redhat-ai-americas/ui-template"
 
 
 @click.group()
@@ -571,6 +575,522 @@ def agent(
         sys.exit(1)
 
 
+@create.command("gateway")
+@click.argument("project_name")
+@click.option(
+    "--target-dir",
+    "-t",
+    default=None,
+    help="Target directory for the project (default: current directory)",
+)
+@click.option(
+    "--no-git",
+    is_flag=True,
+    default=False,
+    help="Skip git repository initialization",
+)
+@click.option(
+    "--github",
+    "use_github",
+    is_flag=True,
+    default=False,
+    help="Create GitHub repository and push code",
+)
+@click.option(
+    "--local",
+    "use_local",
+    is_flag=True,
+    default=False,
+    help="Create local project only (skip GitHub)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help="Non-interactive mode (use defaults, skip prompts)",
+)
+@click.option(
+    "--private",
+    is_flag=True,
+    default=False,
+    help="Make GitHub repository private (default: public)",
+)
+@click.option(
+    "--org",
+    default=None,
+    help="GitHub organization to create repository in",
+)
+@click.option(
+    "--description",
+    "-d",
+    "repo_description",
+    default=None,
+    help="GitHub repository description",
+)
+@click.option(
+    "--remote-only",
+    is_flag=True,
+    default=False,
+    help="Create GitHub repo only, don't clone locally",
+)
+def gateway(
+    project_name: str,
+    target_dir: str | None,
+    no_git: bool,
+    use_github: bool,
+    use_local: bool,
+    yes: bool,
+    private: bool,
+    org: str | None,
+    repo_description: str | None,
+    remote_only: bool,
+):
+    """
+    Create a new API gateway project from template.
+
+    PROJECT_NAME must start with a lowercase letter and contain only
+    lowercase letters, numbers, hyphens, and underscores.
+
+    By default, if GitHub CLI (gh) is installed and authenticated, prompts
+    to create a GitHub repository. Use --local to skip this, or --github
+    to require it. Use --yes for non-interactive mode (agents/CI).
+
+    Examples:
+
+        fips-agents create gateway my-gateway
+
+        fips-agents create gateway my-gateway --github --private
+
+        fips-agents create gateway my-gateway --local
+
+        fips-agents create gateway my-gateway --yes
+    """
+    try:
+        # Step 1: Validate options
+        if use_github and use_local:
+            console.print("[red]✗[/red] Cannot use --github and --local together")
+            sys.exit(1)
+
+        if remote_only and use_local:
+            console.print("[red]✗[/red] Cannot use --remote-only with --local")
+            sys.exit(1)
+
+        # Step 2: Validate project name
+        console.print("\n[bold cyan]Creating Gateway Project[/bold cyan]\n")
+
+        is_valid, error_msg = validate_project_name(project_name)
+        if not is_valid:
+            console.print(f"[red]✗[/red] Invalid project name: {error_msg}")
+            sys.exit(1)
+
+        console.print(f"[green]✓[/green] Project name '{project_name}' is valid")
+
+        # Step 3: Check prerequisites
+        if not is_git_installed():
+            console.print(
+                "[yellow]⚠[/yellow] Git is not installed. This is required for cloning templates."
+            )
+            console.print("[yellow]Hint:[/yellow] Install git from https://git-scm.com/downloads")
+            sys.exit(1)
+
+        # Step 4: Resolve and validate target directory (skip for remote-only)
+        target_path = None
+        if not remote_only:
+            target_path = resolve_target_path(project_name, target_dir)
+
+            is_valid, error_msg = validate_target_directory(target_path, allow_existing=False)
+            if not is_valid:
+                console.print(f"[red]✗[/red] {error_msg}")
+                console.print(
+                    "\n[yellow]Hint:[/yellow] Choose a different name or remove the existing "
+                    "directory"
+                )
+                sys.exit(1)
+
+            console.print(f"[green]✓[/green] Target directory: {target_path}")
+
+        # Step 5: Determine mode (GitHub or local)
+        create_github = _determine_github_mode(use_github, use_local, yes)
+
+        if create_github:
+            ready, error_msg = check_gh_prerequisites()
+            if not ready:
+                console.print(f"[red]✗[/red] {error_msg}")
+                sys.exit(1)
+
+        # Step 6: Create GitHub repo first (if GitHub mode)
+        github_repo = None
+        github_url = None
+        if create_github:
+            success, github_url, error_msg = create_github_repo(
+                name=project_name,
+                private=private,
+                org=org,
+                description=repo_description,
+            )
+            if not success:
+                console.print(f"[red]✗[/red] {error_msg}")
+                sys.exit(1)
+
+            owner = org if org else get_github_username()
+            github_repo = f"{owner}/{project_name}"
+
+        # Step 7: Handle remote-only mode
+        if remote_only:
+            _show_gateway_remote_only_success(project_name, github_url, github_repo)
+            return
+
+        # Step 8: Clone template repository
+        template_commit = None
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task(description="Cloning gateway template...", total=None)
+            try:
+                template_commit = clone_template(GATEWAY_TEMPLATE_URL, target_path)
+            except Exception as e:
+                console.print("\n[red]✗[/red] Failed to clone gateway template")
+                console.print(f"[red]Error:[/red] {e}")
+                console.print(
+                    f"\n[yellow]Hint:[/yellow] Check your internet connection and verify "
+                    f"the template URL is accessible:\n{GATEWAY_TEMPLATE_URL}"
+                )
+                sys.exit(1)
+
+        # Step 9: Customize project
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task(description="Customizing project...", total=None)
+            try:
+                customize_go_project(target_path, project_name, "gateway-template")
+                cleanup_template_files(target_path)
+                if template_commit:
+                    write_template_info(
+                        target_path,
+                        project_name,
+                        GATEWAY_TEMPLATE_URL,
+                        template_commit,
+                        github_repo=github_repo,
+                        github_url=github_url,
+                    )
+            except Exception as e:
+                console.print("\n[red]✗[/red] Failed to customize project")
+                console.print(f"[red]Error:[/red] {e}")
+                sys.exit(1)
+
+        # Step 10: Initialize git repository
+        if not no_git:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task(description="Initializing git repository...", total=None)
+                try:
+                    init_repository(target_path, initial_commit=True)
+                except Exception as e:
+                    console.print("\n[yellow]⚠[/yellow] Failed to initialize git repository")
+                    console.print(f"[yellow]Warning:[/yellow] {e}")
+                    console.print(
+                        "[yellow]You can initialize git manually later with:[/yellow] git init"
+                    )
+
+        # Step 11: Push to GitHub (if GitHub mode)
+        if create_github and not no_git:
+            try:
+                add_remote(target_path, "origin", github_url)
+                push_success = push_to_remote(target_path, "origin", "main")
+                if not push_success:
+                    console.print(
+                        "\n[yellow]⚠[/yellow] Failed to push to GitHub. "
+                        "You can push manually with: git push -u origin main"
+                    )
+            except Exception as e:
+                console.print(f"\n[yellow]⚠[/yellow] Failed to set up GitHub remote: {e}")
+                console.print("[yellow]You can add the remote manually with:[/yellow]")
+                console.print(f"  git remote add origin {github_url}")
+                console.print("  git push -u origin main")
+
+        # Step 12: Success message
+        _show_gateway_success_message(
+            project_name=project_name,
+            target_path=target_path,
+            github_url=github_url,
+            github_repo=github_repo,
+        )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
+        sys.exit(130)
+    except Exception as e:
+        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        sys.exit(1)
+
+
+@create.command("ui")
+@click.argument("project_name")
+@click.option(
+    "--target-dir",
+    "-t",
+    default=None,
+    help="Target directory for the project (default: current directory)",
+)
+@click.option(
+    "--no-git",
+    is_flag=True,
+    default=False,
+    help="Skip git repository initialization",
+)
+@click.option(
+    "--github",
+    "use_github",
+    is_flag=True,
+    default=False,
+    help="Create GitHub repository and push code",
+)
+@click.option(
+    "--local",
+    "use_local",
+    is_flag=True,
+    default=False,
+    help="Create local project only (skip GitHub)",
+)
+@click.option(
+    "--yes",
+    "-y",
+    is_flag=True,
+    default=False,
+    help="Non-interactive mode (use defaults, skip prompts)",
+)
+@click.option(
+    "--private",
+    is_flag=True,
+    default=False,
+    help="Make GitHub repository private (default: public)",
+)
+@click.option(
+    "--org",
+    default=None,
+    help="GitHub organization to create repository in",
+)
+@click.option(
+    "--description",
+    "-d",
+    "repo_description",
+    default=None,
+    help="GitHub repository description",
+)
+@click.option(
+    "--remote-only",
+    is_flag=True,
+    default=False,
+    help="Create GitHub repo only, don't clone locally",
+)
+def ui(
+    project_name: str,
+    target_dir: str | None,
+    no_git: bool,
+    use_github: bool,
+    use_local: bool,
+    yes: bool,
+    private: bool,
+    org: str | None,
+    repo_description: str | None,
+    remote_only: bool,
+):
+    """
+    Create a new chat UI project from template.
+
+    PROJECT_NAME must start with a lowercase letter and contain only
+    lowercase letters, numbers, hyphens, and underscores.
+
+    By default, if GitHub CLI (gh) is installed and authenticated, prompts
+    to create a GitHub repository. Use --local to skip this, or --github
+    to require it. Use --yes for non-interactive mode (agents/CI).
+
+    Examples:
+
+        fips-agents create ui my-chat-ui
+
+        fips-agents create ui my-chat-ui --github --private
+
+        fips-agents create ui my-chat-ui --local
+
+        fips-agents create ui my-chat-ui --yes
+    """
+    try:
+        # Step 1: Validate options
+        if use_github and use_local:
+            console.print("[red]✗[/red] Cannot use --github and --local together")
+            sys.exit(1)
+
+        if remote_only and use_local:
+            console.print("[red]✗[/red] Cannot use --remote-only with --local")
+            sys.exit(1)
+
+        # Step 2: Validate project name
+        console.print("\n[bold cyan]Creating Chat UI Project[/bold cyan]\n")
+
+        is_valid, error_msg = validate_project_name(project_name)
+        if not is_valid:
+            console.print(f"[red]✗[/red] Invalid project name: {error_msg}")
+            sys.exit(1)
+
+        console.print(f"[green]✓[/green] Project name '{project_name}' is valid")
+
+        # Step 3: Check prerequisites
+        if not is_git_installed():
+            console.print(
+                "[yellow]⚠[/yellow] Git is not installed. This is required for cloning templates."
+            )
+            console.print("[yellow]Hint:[/yellow] Install git from https://git-scm.com/downloads")
+            sys.exit(1)
+
+        # Step 4: Resolve and validate target directory (skip for remote-only)
+        target_path = None
+        if not remote_only:
+            target_path = resolve_target_path(project_name, target_dir)
+
+            is_valid, error_msg = validate_target_directory(target_path, allow_existing=False)
+            if not is_valid:
+                console.print(f"[red]✗[/red] {error_msg}")
+                console.print(
+                    "\n[yellow]Hint:[/yellow] Choose a different name or remove the existing "
+                    "directory"
+                )
+                sys.exit(1)
+
+            console.print(f"[green]✓[/green] Target directory: {target_path}")
+
+        # Step 5: Determine mode (GitHub or local)
+        create_github = _determine_github_mode(use_github, use_local, yes)
+
+        if create_github:
+            ready, error_msg = check_gh_prerequisites()
+            if not ready:
+                console.print(f"[red]✗[/red] {error_msg}")
+                sys.exit(1)
+
+        # Step 6: Create GitHub repo first (if GitHub mode)
+        github_repo = None
+        github_url = None
+        if create_github:
+            success, github_url, error_msg = create_github_repo(
+                name=project_name,
+                private=private,
+                org=org,
+                description=repo_description,
+            )
+            if not success:
+                console.print(f"[red]✗[/red] {error_msg}")
+                sys.exit(1)
+
+            owner = org if org else get_github_username()
+            github_repo = f"{owner}/{project_name}"
+
+        # Step 7: Handle remote-only mode
+        if remote_only:
+            _show_ui_remote_only_success(project_name, github_url, github_repo)
+            return
+
+        # Step 8: Clone template repository
+        template_commit = None
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task(description="Cloning UI template...", total=None)
+            try:
+                template_commit = clone_template(UI_TEMPLATE_URL, target_path)
+            except Exception as e:
+                console.print("\n[red]✗[/red] Failed to clone UI template")
+                console.print(f"[red]Error:[/red] {e}")
+                console.print(
+                    f"\n[yellow]Hint:[/yellow] Check your internet connection and verify "
+                    f"the template URL is accessible:\n{UI_TEMPLATE_URL}"
+                )
+                sys.exit(1)
+
+        # Step 9: Customize project
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            console=console,
+        ) as progress:
+            progress.add_task(description="Customizing project...", total=None)
+            try:
+                customize_go_project(target_path, project_name, "ui-template")
+                cleanup_template_files(target_path)
+                if template_commit:
+                    write_template_info(
+                        target_path,
+                        project_name,
+                        UI_TEMPLATE_URL,
+                        template_commit,
+                        github_repo=github_repo,
+                        github_url=github_url,
+                    )
+            except Exception as e:
+                console.print("\n[red]✗[/red] Failed to customize project")
+                console.print(f"[red]Error:[/red] {e}")
+                sys.exit(1)
+
+        # Step 10: Initialize git repository
+        if not no_git:
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console,
+            ) as progress:
+                progress.add_task(description="Initializing git repository...", total=None)
+                try:
+                    init_repository(target_path, initial_commit=True)
+                except Exception as e:
+                    console.print("\n[yellow]⚠[/yellow] Failed to initialize git repository")
+                    console.print(f"[yellow]Warning:[/yellow] {e}")
+                    console.print(
+                        "[yellow]You can initialize git manually later with:[/yellow] git init"
+                    )
+
+        # Step 11: Push to GitHub (if GitHub mode)
+        if create_github and not no_git:
+            try:
+                add_remote(target_path, "origin", github_url)
+                push_success = push_to_remote(target_path, "origin", "main")
+                if not push_success:
+                    console.print(
+                        "\n[yellow]⚠[/yellow] Failed to push to GitHub. "
+                        "You can push manually with: git push -u origin main"
+                    )
+            except Exception as e:
+                console.print(f"\n[yellow]⚠[/yellow] Failed to set up GitHub remote: {e}")
+                console.print("[yellow]You can add the remote manually with:[/yellow]")
+                console.print(f"  git remote add origin {github_url}")
+                console.print("  git push -u origin main")
+
+        # Step 12: Success message
+        _show_ui_success_message(
+            project_name=project_name,
+            target_path=target_path,
+            github_url=github_url,
+            github_repo=github_repo,
+        )
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
+        sys.exit(130)
+    except Exception as e:
+        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        sys.exit(1)
+
+
 def _determine_github_mode(use_github: bool, use_local: bool, yes: bool) -> bool:
     """
     Determine whether to create a GitHub repository.
@@ -783,6 +1303,156 @@ def _show_agent_remote_only_success(
 
   2. The repository contains the agent template.
      Run /plan-agent in Claude Code to design your agent.
+
+[bold cyan]Note:[/bold cyan]
+  The repository contains the raw template.
+  You may want to customize project names and paths.
+"""
+
+    console.print(Panel(success_message, border_style="green", padding=(1, 2)))
+
+
+def _show_gateway_success_message(
+    project_name: str,
+    target_path,
+    github_url: str | None,
+    github_repo: str | None,
+) -> None:
+    """Display success message with next steps for gateway projects."""
+    details = f"""  • Name: {project_name}
+  • Location: {target_path}"""
+
+    if github_url:
+        details += f"\n  • GitHub: {github_url}"
+
+    next_steps = f"""
+  1. Navigate to your project:
+     [dim]cd {target_path.name}[/dim]
+
+  2. Build the server:
+     [dim]go build ./cmd/server[/dim]
+
+  3. Run the server:
+     [dim]BACKEND_URL=http://localhost:8080 ./bin/server[/dim]
+
+  4. Run tests:
+     [dim]make test[/dim]
+
+  5. Deploy to OpenShift:
+     [dim]make deploy PROJECT={project_name}[/dim]"""
+
+    success_message = f"""
+[bold green]✓ Successfully created gateway project![/bold green]
+
+[bold cyan]Project Details:[/bold cyan]
+{details}
+
+[bold cyan]Next Steps:[/bold cyan]
+{next_steps}
+
+[bold cyan]Documentation:[/bold cyan]
+  • See {target_path.name}/CLAUDE.md for development guide
+"""
+
+    console.print(Panel(success_message, border_style="green", padding=(1, 2)))
+
+
+def _show_gateway_remote_only_success(
+    project_name: str,
+    github_url: str,
+    github_repo: str,
+) -> None:
+    """Display success message for gateway remote-only mode."""
+    success_message = f"""
+[bold green]✓ Successfully created GitHub repository![/bold green]
+
+[bold cyan]Repository Details:[/bold cyan]
+  • Name: {project_name}
+  • GitHub: {github_url}
+
+[bold cyan]Next Steps:[/bold cyan]
+
+  1. Clone the repository:
+     [dim]git clone {github_url}[/dim]
+     [dim]cd {project_name}[/dim]
+
+  2. The repository contains the gateway template.
+     See CLAUDE.md for development instructions.
+
+[bold cyan]Note:[/bold cyan]
+  The repository contains the raw template.
+  You may want to customize project names and paths.
+"""
+
+    console.print(Panel(success_message, border_style="green", padding=(1, 2)))
+
+
+def _show_ui_success_message(
+    project_name: str,
+    target_path,
+    github_url: str | None,
+    github_repo: str | None,
+) -> None:
+    """Display success message with next steps for UI projects."""
+    details = f"""  • Name: {project_name}
+  • Location: {target_path}"""
+
+    if github_url:
+        details += f"\n  • GitHub: {github_url}"
+
+    next_steps = f"""
+  1. Navigate to your project:
+     [dim]cd {target_path.name}[/dim]
+
+  2. Build the server:
+     [dim]go build -o bin/server ./cmd/server[/dim]
+
+  3. Run the server:
+     [dim]API_URL=http://localhost:8080 ./bin/server[/dim]
+
+  4. Open in your browser:
+     [dim]http://localhost:3000[/dim]
+
+  5. Deploy to OpenShift:
+     [dim]make deploy PROJECT={project_name}[/dim]"""
+
+    success_message = f"""
+[bold green]✓ Successfully created chat UI project![/bold green]
+
+[bold cyan]Project Details:[/bold cyan]
+{details}
+
+[bold cyan]Next Steps:[/bold cyan]
+{next_steps}
+
+[bold cyan]Documentation:[/bold cyan]
+  • See {target_path.name}/CLAUDE.md for development guide
+"""
+
+    console.print(Panel(success_message, border_style="green", padding=(1, 2)))
+
+
+def _show_ui_remote_only_success(
+    project_name: str,
+    github_url: str,
+    github_repo: str,
+) -> None:
+    """Display success message for UI remote-only mode."""
+    success_message = f"""
+[bold green]✓ Successfully created GitHub repository![/bold green]
+
+[bold cyan]Repository Details:[/bold cyan]
+  • Name: {project_name}
+  • GitHub: {github_url}
+
+[bold cyan]Next Steps:[/bold cyan]
+
+  1. Clone the repository:
+     [dim]git clone {github_url}[/dim]
+     [dim]cd {project_name}[/dim]
+
+  2. The repository contains the chat UI template.
+     See CLAUDE.md for development instructions.
 
 [bold cyan]Note:[/bold cyan]
   The repository contains the raw template.

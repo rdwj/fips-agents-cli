@@ -860,3 +860,121 @@ class TestCreateAgentGitHub:
 
         assert result.exit_code == 0
         mock_create_gh.assert_called_with(name="my-agent", private=True, org=None, description=None)
+
+
+class TestCreateGateway:
+    """Tests for the 'create gateway' command."""
+
+    def test_help_message(self, cli_runner):
+        """Test that help message is displayed correctly."""
+        result = cli_runner.invoke(cli, ["create", "gateway", "--help"])
+        assert result.exit_code == 0
+        assert "gateway" in result.output.lower()
+        assert "PROJECT_NAME" in result.output
+
+    def test_invalid_project_name_uppercase(self, cli_runner):
+        """Test that uppercase letters in project name are rejected."""
+        result = cli_runner.invoke(cli, ["create", "gateway", "MyGateway"])
+        assert result.exit_code == 1
+        assert "Invalid project name" in result.output
+
+    @patch("fips_agents_cli.commands.create.clone_template")
+    @patch("fips_agents_cli.commands.create.customize_go_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.init_repository")
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.is_gh_installed")
+    def test_successful_creation(
+        self,
+        mock_gh_installed,
+        mock_is_git_installed,
+        mock_init_repo,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test successful gateway project creation."""
+        mock_is_git_installed.return_value = True
+        mock_gh_installed.return_value = False
+
+        def create_minimal_structure(url, target_path, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "go.mod").write_text("module gateway-template\n\ngo 1.22\n")
+
+        mock_clone.side_effect = create_minimal_structure
+
+        result = cli_runner.invoke(
+            cli, ["create", "gateway", "my-gateway", "--local", "--target-dir", str(temp_dir)]
+        )
+
+        assert mock_clone.called
+        mock_clone.assert_called_once()
+        # Verify the URL passed to clone_template
+        call_args = mock_clone.call_args
+        assert call_args[0][0] == "https://github.com/redhat-ai-americas/gateway-template"
+        assert mock_customize.called
+        assert mock_cleanup.called
+        assert mock_init_repo.called
+        assert result.exit_code == 0
+        assert "Successfully created gateway project" in result.output
+        assert "my-gateway" in result.output
+
+
+class TestCreateUi:
+    """Tests for the 'create ui' command."""
+
+    def test_help_message(self, cli_runner):
+        """Test that help message is displayed correctly."""
+        result = cli_runner.invoke(cli, ["create", "ui", "--help"])
+        assert result.exit_code == 0
+        assert "chat UI" in result.output or "ui" in result.output.lower()
+        assert "PROJECT_NAME" in result.output
+
+    def test_invalid_project_name_uppercase(self, cli_runner):
+        """Test that uppercase letters in project name are rejected."""
+        result = cli_runner.invoke(cli, ["create", "ui", "MyUI"])
+        assert result.exit_code == 1
+        assert "Invalid project name" in result.output
+
+    @patch("fips_agents_cli.commands.create.clone_template")
+    @patch("fips_agents_cli.commands.create.customize_go_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.init_repository")
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.is_gh_installed")
+    def test_successful_creation(
+        self,
+        mock_gh_installed,
+        mock_is_git_installed,
+        mock_init_repo,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test successful UI project creation."""
+        mock_is_git_installed.return_value = True
+        mock_gh_installed.return_value = False
+
+        def create_minimal_structure(url, target_path, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "go.mod").write_text("module ui-template\n\ngo 1.22\n")
+
+        mock_clone.side_effect = create_minimal_structure
+
+        result = cli_runner.invoke(
+            cli, ["create", "ui", "my-chat-ui", "--local", "--target-dir", str(temp_dir)]
+        )
+
+        assert mock_clone.called
+        call_args = mock_clone.call_args
+        assert call_args[0][0] == "https://github.com/redhat-ai-americas/ui-template"
+        assert mock_customize.called
+        assert mock_cleanup.called
+        assert mock_init_repo.called
+        assert result.exit_code == 0
+        assert "Successfully created chat UI project" in result.output
+        assert "my-chat-ui" in result.output

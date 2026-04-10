@@ -209,6 +209,61 @@ def customize_agent_project(project_path: Path, new_name: str) -> None:
         raise
 
 
+def customize_go_project(project_path: Path, new_name: str, sentinel: str) -> None:
+    """
+    Customize a Go-based template project with the new project name.
+
+    Replaces the sentinel string with the new project name across configuration
+    and build files. Unlike Python projects, Go projects don't have pyproject.toml
+    or source directory renaming -- customization is purely string replacement.
+
+    Args:
+        project_path: Path to the project root directory
+        new_name: The new project name (with hyphens allowed)
+        sentinel: The template's placeholder string to replace (e.g. "gateway-template")
+    """
+    try:
+        console.print(f"[cyan]Customizing Go project for '{new_name}'...[/cyan]")
+
+        # go.mod is required -- fail if missing
+        go_mod = project_path / "go.mod"
+        if not go_mod.exists():
+            raise FileNotFoundError(f"go.mod not found at {go_mod}")
+
+        _replace_in_file(go_mod, sentinel, new_name)
+        console.print("[green]✓[/green] Updated go.mod")
+
+        # Configuration and build files (optional -- tolerate missing)
+        optional_files = [
+            project_path / "chart" / "Chart.yaml",
+            project_path / "chart" / "values.yaml",
+            project_path / "chart" / "templates" / "_helpers.tpl",
+            project_path / "Containerfile",
+            project_path / "Makefile",
+            project_path / "README.md",
+            project_path / "CLAUDE.md",
+        ]
+
+        for file_path in optional_files:
+            _replace_in_file(file_path, sentinel, new_name)
+
+        # Check HTML files in static/ for sentinels (e.g. <title> tags in UI templates)
+        static_dir = project_path / "static"
+        if static_dir.exists():
+            for html_file in static_dir.glob("*.html"):
+                _replace_in_file(html_file, sentinel, new_name)
+
+        console.print("[green]✓[/green] Updated configuration files")
+        console.print("[green]✓[/green] Go project customization complete")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        raise
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to customize Go project: {e}")
+        raise
+
+
 def cleanup_template_files(project_path: Path) -> None:
     """
     Remove template-specific files that shouldn't be in the new project.
