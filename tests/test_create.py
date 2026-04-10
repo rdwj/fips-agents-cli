@@ -564,3 +564,299 @@ class TestCreateMcpServerGitHub:
             # Should NOT call GitHub
             assert not mock_create_gh.called
             assert result.exit_code == 0
+
+
+class TestCreateAgent:
+    """Tests for the 'create agent' command."""
+
+    def test_help_message(self, cli_runner):
+        """Test that help message is displayed correctly."""
+        result = cli_runner.invoke(cli, ["create", "agent", "--help"])
+        assert result.exit_code == 0
+        assert "Create a new AI agent project" in result.output
+        assert "PROJECT_NAME" in result.output
+
+    def test_invalid_project_name_uppercase(self, cli_runner):
+        """Test that uppercase letters in project name are rejected."""
+        result = cli_runner.invoke(cli, ["create", "agent", "TestAgent"])
+        assert result.exit_code == 1
+        assert "Invalid project name" in result.output
+
+    def test_invalid_project_name_special_chars(self, cli_runner):
+        """Test that special characters in project name are rejected."""
+        result = cli_runner.invoke(cli, ["create", "agent", "test@agent"])
+        assert result.exit_code == 1
+        assert "Invalid project name" in result.output
+
+    def test_invalid_project_name_starts_with_number(self, cli_runner):
+        """Test that project name starting with number is rejected."""
+        result = cli_runner.invoke(cli, ["create", "agent", "123agent"])
+        assert result.exit_code == 1
+        assert "Invalid project name" in result.output
+
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=False)
+    @patch("fips_agents_cli.commands.create.is_git_installed", return_value=True)
+    def test_existing_directory_error(
+        self, mock_is_git_installed, mock_is_gh_installed, cli_runner, temp_dir
+    ):
+        """Test that existing directory causes an error."""
+        existing_dir = temp_dir / "existing-agent"
+        existing_dir.mkdir()
+
+        result = cli_runner.invoke(
+            cli, ["create", "agent", "existing-agent", "--target-dir", str(temp_dir)]
+        )
+        assert result.exit_code == 1
+        assert "already exists" in result.output
+
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=False)
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    def test_git_not_installed(
+        self, mock_is_git_installed, mock_is_gh_installed, cli_runner, temp_dir
+    ):
+        """Test that missing git installation is detected."""
+        mock_is_git_installed.return_value = False
+
+        result = cli_runner.invoke(
+            cli, ["create", "agent", "test-agent", "--target-dir", str(temp_dir)]
+        )
+        assert result.exit_code == 1
+        assert "Git is not installed" in result.output
+
+    @patch("fips_agents_cli.commands.create.clone_template_subdir")
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.is_gh_installed")
+    def test_clone_failure(
+        self, mock_gh_installed, mock_is_git_installed, mock_clone, cli_runner, temp_dir
+    ):
+        """Test handling of template clone failures."""
+        mock_is_git_installed.return_value = True
+        mock_gh_installed.return_value = False
+        mock_clone.side_effect = Exception("Connection timeout")
+
+        result = cli_runner.invoke(
+            cli, ["create", "agent", "test-agent", "--target-dir", str(temp_dir)]
+        )
+        assert result.exit_code == 1
+        assert "Failed to clone agent template" in result.output
+
+    @patch("fips_agents_cli.commands.create.clone_template_subdir")
+    @patch("fips_agents_cli.commands.create.customize_agent_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.init_repository")
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.is_gh_installed")
+    def test_successful_creation(
+        self,
+        mock_gh_installed,
+        mock_is_git_installed,
+        mock_init_repo,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test successful agent project creation with all steps."""
+        mock_is_git_installed.return_value = True
+        mock_gh_installed.return_value = False
+
+        def create_minimal_structure(url, target_path, subdir, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
+
+        mock_clone.side_effect = create_minimal_structure
+
+        result = cli_runner.invoke(
+            cli, ["create", "agent", "my-agent", "--target-dir", str(temp_dir)]
+        )
+
+        assert mock_clone.called
+        assert mock_customize.called
+        assert mock_cleanup.called
+        assert mock_init_repo.called
+        assert result.exit_code == 0
+        assert "Successfully created agent project" in result.output
+        assert "my-agent" in result.output
+
+    @patch("fips_agents_cli.commands.create.clone_template_subdir")
+    @patch("fips_agents_cli.commands.create.customize_agent_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.is_gh_installed")
+    def test_no_git_flag(
+        self,
+        mock_gh_installed,
+        mock_is_git_installed,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test that --no-git flag skips git initialization."""
+        mock_is_git_installed.return_value = True
+        mock_gh_installed.return_value = False
+
+        def create_minimal_structure(url, target_path, subdir, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
+
+        mock_clone.side_effect = create_minimal_structure
+
+        with patch("fips_agents_cli.commands.create.init_repository") as mock_init:
+            result = cli_runner.invoke(
+                cli,
+                ["create", "agent", "my-agent", "--target-dir", str(temp_dir), "--no-git"],
+            )
+
+            assert not mock_init.called
+            assert result.exit_code == 0
+
+
+class TestCreateAgentGitHub:
+    """Tests for GitHub integration in 'create agent' command."""
+
+    def test_github_and_local_mutually_exclusive(self, cli_runner):
+        """Test that --github and --local cannot be used together."""
+        result = cli_runner.invoke(cli, ["create", "agent", "test-agent", "--github", "--local"])
+        assert result.exit_code == 1
+        assert "Cannot use --github and --local together" in result.output
+
+    def test_remote_only_and_local_mutually_exclusive(self, cli_runner):
+        """Test that --remote-only and --local cannot be used together."""
+        result = cli_runner.invoke(
+            cli, ["create", "agent", "test-agent", "--remote-only", "--local"]
+        )
+        assert result.exit_code == 1
+        assert "Cannot use --remote-only with --local" in result.output
+
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.check_gh_prerequisites")
+    @patch("fips_agents_cli.commands.create.create_github_repo")
+    @patch("fips_agents_cli.commands.create.get_github_username")
+    @patch("fips_agents_cli.commands.create.clone_template_subdir")
+    @patch("fips_agents_cli.commands.create.customize_agent_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.init_repository")
+    @patch("fips_agents_cli.commands.create.add_remote")
+    @patch("fips_agents_cli.commands.create.push_to_remote")
+    def test_github_flow_creates_repo_and_pushes(
+        self,
+        mock_push,
+        mock_add_remote,
+        mock_init_repo,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        mock_get_username,
+        mock_create_gh,
+        mock_check_gh,
+        mock_is_git_installed,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test full GitHub flow creates repo and pushes code."""
+        mock_is_git_installed.return_value = True
+        mock_check_gh.return_value = (True, None)
+        mock_create_gh.return_value = (True, "https://github.com/testuser/my-agent", None)
+        mock_get_username.return_value = "testuser"
+        mock_push.return_value = True
+
+        def create_minimal_structure(url, target_path, subdir, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
+
+        mock_clone.side_effect = create_minimal_structure
+
+        result = cli_runner.invoke(
+            cli,
+            ["create", "agent", "my-agent", "--github", "--target-dir", str(temp_dir)],
+        )
+
+        assert result.exit_code == 0
+        assert mock_create_gh.called
+        assert mock_add_remote.called
+        assert mock_push.called
+        assert "Successfully created" in result.output
+
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.check_gh_prerequisites")
+    @patch("fips_agents_cli.commands.create.create_github_repo")
+    @patch("fips_agents_cli.commands.create.get_github_username")
+    def test_remote_only_mode(
+        self,
+        mock_get_username,
+        mock_create_gh,
+        mock_check_gh,
+        mock_is_git_installed,
+        cli_runner,
+    ):
+        """Test --remote-only creates GitHub repo without local clone."""
+        mock_is_git_installed.return_value = True
+        mock_check_gh.return_value = (True, None)
+        mock_create_gh.return_value = (True, "https://github.com/testuser/my-agent", None)
+        mock_get_username.return_value = "testuser"
+
+        with patch("fips_agents_cli.commands.create.clone_template_subdir") as mock_clone:
+            result = cli_runner.invoke(
+                cli, ["create", "agent", "my-agent", "--github", "--remote-only"]
+            )
+
+            assert result.exit_code == 0
+            assert not mock_clone.called
+            assert "Successfully created GitHub repository" in result.output
+
+    @patch("fips_agents_cli.commands.create.is_git_installed")
+    @patch("fips_agents_cli.commands.create.check_gh_prerequisites")
+    @patch("fips_agents_cli.commands.create.create_github_repo")
+    @patch("fips_agents_cli.commands.create.get_github_username")
+    @patch("fips_agents_cli.commands.create.clone_template_subdir")
+    @patch("fips_agents_cli.commands.create.customize_agent_project")
+    @patch("fips_agents_cli.commands.create.cleanup_template_files")
+    @patch("fips_agents_cli.commands.create.init_repository")
+    @patch("fips_agents_cli.commands.create.add_remote")
+    @patch("fips_agents_cli.commands.create.push_to_remote")
+    def test_private_repo_option(
+        self,
+        mock_push,
+        mock_add_remote,
+        mock_init_repo,
+        mock_cleanup,
+        mock_customize,
+        mock_clone,
+        mock_get_username,
+        mock_create_gh,
+        mock_check_gh,
+        mock_is_git_installed,
+        cli_runner,
+        temp_dir,
+    ):
+        """Test --private flag creates private GitHub repo."""
+        mock_is_git_installed.return_value = True
+        mock_check_gh.return_value = (True, None)
+        mock_create_gh.return_value = (True, "https://github.com/testuser/my-agent", None)
+        mock_get_username.return_value = "testuser"
+        mock_push.return_value = True
+
+        def create_minimal_structure(url, target_path, subdir, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
+
+        mock_clone.side_effect = create_minimal_structure
+
+        result = cli_runner.invoke(
+            cli,
+            [
+                "create",
+                "agent",
+                "my-agent",
+                "--github",
+                "--private",
+                "--target-dir",
+                str(temp_dir),
+            ],
+        )
+
+        assert result.exit_code == 0
+        mock_create_gh.assert_called_with(name="my-agent", private=True, org=None, description=None)

@@ -1,6 +1,7 @@
 """Git operations for cloning and initializing repositories."""
 
 import shutil
+import tempfile
 from pathlib import Path
 
 import git
@@ -56,6 +57,39 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> st
     except Exception as e:
         console.print(f"[red]✗[/red] Unexpected error during clone: {e}")
         raise
+
+
+def clone_template_subdir(
+    repo_url: str, target_path: Path, subdir: str, branch: str = "main"
+) -> str:
+    """
+    Clone a monorepo and extract a subdirectory as the project root.
+
+    Clones the full repository to a temporary directory, copies the specified
+    subdirectory to the target path, then cleans up. This is used for templates
+    that live inside a monorepo rather than being standalone repositories.
+
+    Args:
+        repo_url: The URL of the git repository to clone
+        target_path: The local path where the subdirectory should be extracted
+        subdir: The subdirectory path within the repository (e.g., "templates/agent-loop")
+        branch: The branch to clone (default: "main")
+
+    Returns:
+        str: The commit hash of the cloned template
+
+    Raises:
+        git.GitCommandError: If the clone operation fails
+        FileNotFoundError: If the subdirectory doesn't exist in the repository
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp) / "repo"
+        commit_hash = clone_template(repo_url, tmp_path, branch)
+        src = tmp_path / subdir
+        if not src.is_dir():
+            raise FileNotFoundError(f"Subdirectory '{subdir}' not found in template repo")
+        shutil.copytree(src, target_path, dirs_exist_ok=True)
+        return commit_hash
 
 
 def init_repository(project_path: Path, initial_commit: bool = True) -> None:

@@ -56,6 +56,42 @@ mcp-server-template = "mcp_server_template.server:main"
 
 
 @pytest.fixture
+def mock_agent_template(temp_dir):
+    """Create a mock agent template directory structure."""
+    template = temp_dir / "agent-template"
+    template.mkdir()
+
+    (template / "pyproject.toml").write_text(
+        '[build-system]\nrequires = ["setuptools>=68"]\n\n'
+        '[project]\nname = "agent-template"\nversion = "0.1.0"\n'
+    )
+    (template / "agent.yaml").write_text("model:\n  name: test\n")
+    (template / "Makefile").write_text(
+        "PROJECT     ?= agent-template\nIMAGE_NAME  ?= agent-template\n"
+    )
+    (template / "AGENTS.md").write_text("# agent-template\n\nA BaseAgent built on the template.\n")
+    (template / "Containerfile").write_text(
+        'LABEL io.opencontainers.image.title="agent-template"\n'
+    )
+
+    src = template / "src"
+    src.mkdir()
+    (src / "__init__.py").touch()
+    (src / "agent.py").write_text("# Example agent\n")
+
+    base = src / "base_agent"
+    base.mkdir()
+    (base / "__init__.py").write_text('__version__ = "0.1.0"\n')
+
+    chart = template / "chart"
+    chart.mkdir()
+    (chart / "Chart.yaml").write_text("name: agent-template\nversion: 0.1.0\n")
+    (chart / "values.yaml").write_text("image:\n  repository: agent-template\n")
+
+    return template
+
+
+@pytest.fixture
 def sample_project_name():
     """Provide a valid sample project name."""
     return "test-mcp-server"

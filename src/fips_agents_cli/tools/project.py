@@ -145,6 +145,70 @@ def update_project_name(project_path: Path, new_name: str) -> None:
         raise
 
 
+def _replace_in_file(path: Path, old: str, new: str) -> None:
+    """Replace all occurrences of a string in a file, if the file exists."""
+    if path.exists():
+        text = path.read_text()
+        path.write_text(text.replace(old, new))
+
+
+def customize_agent_project(project_path: Path, new_name: str) -> None:
+    """
+    Customize an agent project with the new project name.
+
+    Replaces 'agent-template' with the new project name across configuration
+    files. Unlike MCP server projects, agent projects don't rename source
+    directories (base_agent is a framework component, not the project module).
+
+    Args:
+        project_path: Path to the project root directory
+        new_name: The new project name (with hyphens allowed)
+
+    Raises:
+        FileNotFoundError: If pyproject.toml doesn't exist
+    """
+    try:
+        console.print(f"[cyan]Customizing agent project for '{new_name}'...[/cyan]")
+
+        # 1. Update pyproject.toml name field (use tomlkit to preserve formatting)
+        pyproject_path = project_path / "pyproject.toml"
+        if not pyproject_path.exists():
+            raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
+
+        with open(pyproject_path) as f:
+            pyproject = tomlkit.parse(f.read())
+
+        if "project" in pyproject:
+            pyproject["project"]["name"] = new_name
+
+        with open(pyproject_path, "w") as f:
+            f.write(tomlkit.dumps(pyproject))
+
+        console.print("[green]✓[/green] Updated pyproject.toml")
+
+        # 2. String-replace "agent-template" in supporting files
+        files_to_update = [
+            project_path / "chart" / "Chart.yaml",
+            project_path / "chart" / "values.yaml",
+            project_path / "AGENTS.md",
+            project_path / "Containerfile",
+            project_path / "Makefile",
+        ]
+
+        for file_path in files_to_update:
+            _replace_in_file(file_path, "agent-template", new_name)
+
+        console.print("[green]✓[/green] Updated configuration files")
+        console.print("[green]✓[/green] Agent project customization complete")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        raise
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to customize agent project: {e}")
+        raise
+
+
 def cleanup_template_files(project_path: Path) -> None:
     """
     Remove template-specific files that shouldn't be in the new project.
