@@ -1,16 +1,17 @@
 # FIPS Agents CLI
 
-A command-line tool for creating and managing FIPS-compliant AI agent projects. Scaffolds MCP (Model Context Protocol) servers and AI agent projects from production-ready templates.
+A command-line tool for creating and managing FIPS-compliant AI agent projects. Scaffolds MCP (Model Context Protocol) servers, AI agent projects, and ModelCar containers from production-ready templates.
 
 ## Features
 
 - 🚀 Quick project scaffolding from templates
-- 📦 MCP server and AI agent project generation
-- 🔧 Automatic project customization
-- ⚡ Component generation (tools, resources, prompts, middleware)
+- 📦 MCP server, AI agent, and ModelCar project generation
+- 🔧 Automatic project customization (pyproject.toml, module names, entry points)
+- ⚡ Component generation (tools, resources, prompts, middleware) with Jinja2 templates
 - 🎨 Beautiful CLI output with Rich
-- ✅ Git repository initialization
-- 🧪 Comprehensive test coverage with auto-run
+- ✅ Git repository initialization and GitHub integration
+- 🧪 Comprehensive test coverage with auto-run on generated components
+- 🔄 Template patching to pull upstream improvements into existing projects
 
 ## Installation
 
@@ -57,97 +58,87 @@ pip install -e .[dev]
 
 ## Quick Start
 
-### Create a new MCP server project
+### Create projects
 
 ```bash
-fips-agents create mcp-server my-awesome-server
-```
+# MCP server
+fips-agents create mcp-server my-mcp-server
 
-This will:
-1. Clone the MCP server template
-2. Customize the project with your chosen name
-3. Initialize a git repository
-4. Provide next steps for development
-
-### Specify a target directory
-
-```bash
-fips-agents create mcp-server my-server --target-dir ~/projects
-```
-
-### Skip git initialization
-
-```bash
-fips-agents create mcp-server my-server --no-git
-```
-
-### Create a new AI agent project
-
-```bash
+# AI agent
 fips-agents create agent my-research-agent
+
+# ModelCar (HuggingFace model as container)
+fips-agents create model-car ibm-granite/granite-3.1-2b-instruct \
+    quay.io/user/models:granite-3.1-2b-instruct
 ```
 
-This will:
-1. Clone the agent template (from the agent-template monorepo)
-2. Customize the project with your chosen name
-3. Initialize a git repository
-4. Provide next steps including the `/plan-agent` slash command
-
-### Create with GitHub and deploy to OpenShift
+### Generate components in an existing MCP server project
 
 ```bash
-fips-agents create agent my-agent --github --org my-org
-```
-
-### Generate components in an existing project
-
-```bash
-# Navigate to your MCP server project
 cd my-mcp-server
 
-# Generate a new tool
 fips-agents generate tool search_documents --description "Search through documents"
-
-# Generate a resource
 fips-agents generate resource config_data --description "Application configuration"
-
-# Generate a prompt
 fips-agents generate prompt code_review --description "Review code for best practices"
-
-# Generate middleware
 fips-agents generate middleware auth_middleware --description "Authentication middleware"
 ```
 
-## Usage
-
-### Basic Commands
+### Check for template updates
 
 ```bash
-# Display version
-fips-agents --version
+cd my-mcp-server
 
-# Get help
-fips-agents --help
-fips-agents create --help
-fips-agents create mcp-server --help
-fips-agents create agent --help
-fips-agents generate --help
-fips-agents generate tool --help
+fips-agents patch check
+fips-agents patch all --dry-run
 ```
 
-### Create MCP Server
+## Command Reference
+
+### Help
+
+```bash
+fips-agents --version
+fips-agents --help
+fips-agents create --help
+fips-agents generate --help
+fips-agents patch --help
+```
+
+---
+
+### Create Commands
+
+The `create` command group scaffolds new projects from templates.
+
+#### Shared Options (mcp-server and agent)
+
+Both `create mcp-server` and `create agent` accept the same options:
+
+| Option | Description |
+|--------|-------------|
+| `--target-dir, -t PATH` | Target directory for the project (default: current directory) |
+| `--no-git` | Skip git repository initialization |
+| `--github` | Create GitHub repository and push code |
+| `--local` | Create local project only (skip GitHub) |
+| `--yes, -y` | Non-interactive mode (use defaults, skip prompts) |
+| `--private` | Make GitHub repository private (default: public) |
+| `--org TEXT` | GitHub organization to create repository in |
+| `--description, -d TEXT` | GitHub repository description |
+| `--remote-only` | Create GitHub repo only, don't clone locally |
+
+When `gh` CLI is installed and authenticated, the tool prompts interactively about GitHub repo creation. Use `--local` to suppress this, `--github` to require it, or `--yes` for fully non-interactive operation.
+
+#### `create mcp-server`
 
 ```bash
 fips-agents create mcp-server <project-name> [OPTIONS]
 ```
 
-**Arguments:**
-- `project-name`: Name for your MCP server project (must start with lowercase letter, contain only lowercase letters, numbers, hyphens, and underscores)
+Creates an MCP server project from the [mcp-server-template](https://github.com/rdwj/mcp-server-template) repository. The template includes FastMCP server bootstrap, component auto-discovery, Jinja2 generator templates, Makefile, Containerfile, and tests.
 
-**Options:**
-- `--target-dir, -t PATH`: Target directory for the project (default: current directory)
-- `--no-git`: Skip git repository initialization
-- `--help`: Show help message
+**Arguments:**
+
+- `project-name` — Name for your MCP server project
 
 **Examples:**
 
@@ -155,85 +146,127 @@ fips-agents create mcp-server <project-name> [OPTIONS]
 # Create in current directory
 fips-agents create mcp-server my-mcp-server
 
-# Create in specific directory
-fips-agents create mcp-server my-server -t ~/projects
+# Create in specific directory without git
+fips-agents create mcp-server my-server -t ~/projects --no-git
 
-# Create without git initialization
-fips-agents create mcp-server my-server --no-git
+# Create with private GitHub repo in an organization
+fips-agents create mcp-server my-server --github --private --org my-org
+
+# Non-interactive, local only
+fips-agents create mcp-server my-server --yes --local
+
+# Create GitHub repo without cloning locally
+fips-agents create mcp-server my-server --remote-only --org my-org
 ```
 
-### Create Agent
+#### `create agent`
 
 ```bash
 fips-agents create agent <project-name> [OPTIONS]
 ```
 
-**Arguments:**
-- `project-name`: Name for your agent project (must start with lowercase letter, contain only lowercase letters, numbers, hyphens, and underscores)
+Creates an AI agent project from the [agent-template](https://github.com/redhat-ai-americas/agent-template) monorepo (`templates/agent-loop/` subdirectory). The template includes an agent loop skeleton, Helm chart, Makefile, Containerfile, and AGENTS.md.
 
-**Options:**
-- `--target-dir, -t PATH`: Target directory for the project (default: current directory)
-- `--no-git`: Skip git repository initialization
-- `--github`: Create GitHub repository and push code
-- `--local`: Create local project only (skip GitHub)
-- `--yes, -y`: Non-interactive mode (use defaults, skip prompts)
-- `--private`: Make GitHub repository private
-- `--org TEXT`: GitHub organization to create repository in
-- `--description, -d TEXT`: GitHub repository description
-- `--remote-only`: Create GitHub repo only, don't clone locally
-- `--help`: Show help message
+**Arguments:**
+
+- `project-name` — Name for your agent project
+
+**Options:** Same as `create mcp-server` (see shared options table above).
 
 **Examples:**
 
 ```bash
-# Create in current directory
+# Create agent project
 fips-agents create agent my-research-agent
 
 # Create with GitHub repo in an organization
 fips-agents create agent my-agent --github --org redhat-ai-americas
 
-# Create without git initialization
-fips-agents create agent my-agent --no-git
-
 # Non-interactive mode
-fips-agents create agent my-agent --yes
+fips-agents create agent my-agent --yes --local
 ```
 
-### Generate Components
+#### `create model-car`
 
-The `generate` command group allows you to scaffold MCP components (tools, resources, prompts, middleware) in existing MCP server projects.
+```bash
+fips-agents create model-car <hf-repo> <quay-uri> [OPTIONS]
+```
 
-**Important**: Run these commands from within your MCP server project directory.
+Creates a ModelCar project for packaging a HuggingFace model as a container image. Generates download scripts, Containerfile, build-and-push scripts, and project metadata.
 
-#### Generate Tool
+**Arguments:**
+
+- `hf-repo` — HuggingFace repo URL or ID (e.g., `ibm-granite/granite-3.1-2b-instruct` or the full `https://huggingface.co/...` URL)
+- `quay-uri` — Container registry URI with tag (e.g., `quay.io/user/models:granite-3.1-2b-instruct`)
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--target-dir, -t PATH` | Target directory for the project (default: current directory) |
+
+**Examples:**
+
+```bash
+# Using repo ID
+fips-agents create model-car ibm-granite/granite-3.1-2b-instruct \
+    quay.io/wjackson/models:granite-3.1-2b-instruct
+
+# Using full URL with custom target directory
+fips-agents create model-car https://huggingface.co/ibm-granite/granite-3.1-2b-instruct \
+    quay.io/wjackson/models:granite-3.1-2b-instruct -t ~/models
+```
+
+---
+
+### Generate Commands
+
+The `generate` command group scaffolds MCP components (tools, resources, prompts, middleware) in existing MCP server projects created with `fips-agents create mcp-server`.
+
+**Run these commands from within your MCP server project directory.** The CLI locates the project root by looking for `pyproject.toml` with a `fastmcp` dependency.
+
+Each generator:
+1. Validates the component name and checks for conflicts
+2. Loads Jinja2 templates from `.fips-agents-cli/generators/` in your project
+3. Renders both the component file and a corresponding test file
+4. Validates Python syntax on the generated code
+5. Runs the generated tests automatically
+
+Component names must be valid Python identifiers in `snake_case`. Subdirectory paths (e.g., `country-profiles/japan`) are supported for resources.
+
+#### `generate tool`
 
 ```bash
 fips-agents generate tool <name> [OPTIONS]
 ```
 
-**Arguments:**
-- `name`: Tool name in snake_case (e.g., `search_documents`, `fetch_data`)
+Generates a tool component with FastMCP `@mcp.tool()` decorator.
 
 **Options:**
-- `--description, -d TEXT`: Tool description
-- `--async/--sync`: Generate async or sync function (default: async)
-- `--with-context`: Include FastMCP Context parameter
-- `--with-auth`: Include authentication decorator
-- `--params PATH`: JSON file with parameter definitions
-- `--read-only`: Mark as read-only operation (default: true)
-- `--idempotent`: Mark as idempotent (default: true)
-- `--open-world`: Mark as open-world operation
-- `--return-type TEXT`: Return type annotation (default: str)
-- `--dry-run`: Show what would be generated without creating files
+
+| Option | Description |
+|--------|-------------|
+| `--async/--sync` | Generate async or sync function (default: async) |
+| `--with-context` | Include FastMCP Context parameter |
+| `--with-auth` | Include authentication decorator |
+| `--scopes TEXT` | Required OAuth scopes, comma-separated (e.g., `"read:data,write:data"`) |
+| `--with-elicitation` | Include elicitation example code |
+| `--description, -d TEXT` | Tool description |
+| `--params PATH` | JSON file with parameter definitions |
+| `--read-only` | Mark as read-only operation (default: true) |
+| `--idempotent` | Mark as idempotent (default: true) |
+| `--open-world` | Mark as open-world operation |
+| `--return-type TEXT` | Return type annotation (default: `str`) |
+| `--dry-run` | Show what would be generated without creating files |
 
 **Examples:**
 
 ```bash
-# Basic tool generation
+# Basic tool
 fips-agents generate tool search_documents --description "Search through documents"
 
 # Tool with context and authentication
-fips-agents generate tool fetch_user_data --description "Fetch user data" --with-context --with-auth
+fips-agents generate tool fetch_user_data --with-context --with-auth --scopes "read:users"
 
 # Tool with parameters from JSON file
 fips-agents generate tool advanced_search --params params.json
@@ -241,26 +274,28 @@ fips-agents generate tool advanced_search --params params.json
 # Sync tool with custom return type
 fips-agents generate tool process_data --sync --return-type "dict[str, Any]"
 
-# Dry run to preview
+# Preview without creating files
 fips-agents generate tool test_tool --description "Test" --dry-run
 ```
 
-#### Generate Resource
+#### `generate resource`
 
 ```bash
 fips-agents generate resource <name> [OPTIONS]
 ```
 
-**Arguments:**
-- `name`: Resource name in snake_case (e.g., `config_data`, `user_profile`)
+Generates a resource component with FastMCP `@mcp.resource()` decorator. Supports subdirectory paths (e.g., `country-profiles/japan` creates `src/resources/country_profiles/japan.py`). URI template parameters (e.g., `{id}`) are automatically extracted as function arguments.
 
 **Options:**
-- `--description, -d TEXT`: Resource description
-- `--async/--sync`: Generate async or sync function (default: async)
-- `--with-context`: Include FastMCP Context parameter
-- `--uri TEXT`: Resource URI (default: `resource://<name>`)
-- `--mime-type TEXT`: MIME type for resource (default: text/plain)
-- `--dry-run`: Show what would be generated without creating files
+
+| Option | Description |
+|--------|-------------|
+| `--async/--sync` | Generate async or sync function (default: async) |
+| `--with-context` | Include FastMCP Context parameter |
+| `--description, -d TEXT` | Resource description |
+| `--uri TEXT` | Resource URI (default: `resource://<name>`) |
+| `--mime-type TEXT` | MIME type (default: `text/plain`) |
+| `--dry-run` | Show what would be generated without creating files |
 
 **Examples:**
 
@@ -268,27 +303,40 @@ fips-agents generate resource <name> [OPTIONS]
 # Basic resource
 fips-agents generate resource config_data --description "Application configuration"
 
-# Resource with custom URI
-fips-agents generate resource user_profile --uri "resource://users/{id}" --description "User profile data"
+# Resource with URI template (parameters auto-extracted as function args)
+fips-agents generate resource user_profile --uri "resource://users/{id}"
+
+# Resource in a subdirectory
+fips-agents generate resource country-profiles/japan --description "Japan country profile"
 
 # Resource with specific MIME type
 fips-agents generate resource json_config --mime-type "application/json"
 ```
 
-#### Generate Prompt
+#### `generate prompt`
 
 ```bash
 fips-agents generate prompt <name> [OPTIONS]
 ```
 
-**Arguments:**
-- `name`: Prompt name in snake_case (e.g., `code_review`, `summarize_text`)
+Generates a prompt component with FastMCP `@mcp.prompt()` decorator. Note: prompts default to **sync** (unlike tools and resources which default to async).
 
 **Options:**
-- `--description, -d TEXT`: Prompt description
-- `--params PATH`: JSON file with parameter definitions
-- `--with-schema`: Include JSON schema in prompt
-- `--dry-run`: Show what would be generated without creating files
+
+| Option | Description |
+|--------|-------------|
+| `--async/--sync` | Generate async or sync function (default: **sync**) |
+| `--with-context` | Include FastMCP Context parameter |
+| `--description, -d TEXT` | Prompt description |
+| `--params PATH` | JSON file with parameter definitions |
+| `--return-type [str\|Message\|list[Message]]` | Return type (default: `str`) |
+| `--with-schema` | Include JSON schema example in prompt body |
+| `--prompt-name TEXT` | Override decorator name (default: function name) |
+| `--title TEXT` | Human-readable title for the prompt |
+| `--tags TEXT` | Comma-separated tags for categorization |
+| `--disabled` | Generate prompt in disabled state |
+| `--meta TEXT` | JSON string of metadata (e.g., `'{"version": "1.0"}'`) |
+| `--dry-run` | Show what would be generated without creating files |
 
 **Examples:**
 
@@ -296,37 +344,53 @@ fips-agents generate prompt <name> [OPTIONS]
 # Basic prompt
 fips-agents generate prompt code_review --description "Review code for best practices"
 
-# Prompt with parameters
+# Prompt with parameters and schema
 fips-agents generate prompt summarize_text --params params.json --with-schema
+
+# Async prompt returning a Message
+fips-agents generate prompt fetch_data --async --with-context --return-type Message
+
+# Prompt with metadata and tags
+fips-agents generate prompt generate_report \
+    --prompt-name "report_generator" \
+    --title "Report Generator" \
+    --tags "reporting,analysis" \
+    --meta '{"version": "2.0", "author": "data-team"}'
 ```
 
-#### Generate Middleware
+#### `generate middleware`
 
 ```bash
 fips-agents generate middleware <name> [OPTIONS]
 ```
 
-**Arguments:**
-- `name`: Middleware name in snake_case (e.g., `auth_middleware`, `rate_limiter`)
+Generates a middleware component using FastMCP's `@mcp.middleware()` decorator (v3.x class-based pattern). Middleware wraps tool execution and receives a Context and `next_handler`.
 
 **Options:**
-- `--description, -d TEXT`: Middleware description
-- `--async/--sync`: Generate async or sync function (default: async)
-- `--dry-run`: Show what would be generated without creating files
+
+| Option | Description |
+|--------|-------------|
+| `--async/--sync` | Generate async or sync function (default: async) |
+| `--hook-type [before_tool\|after_tool\|on_error]` | Scaffold a specific hook pattern (default: general wrapper) |
+| `--description, -d TEXT` | Middleware description |
+| `--dry-run` | Show what would be generated without creating files |
 
 **Examples:**
 
 ```bash
-# Basic middleware
+# General-purpose wrapper
 fips-agents generate middleware auth_middleware --description "Authentication middleware"
 
-# Sync middleware
-fips-agents generate middleware rate_limiter --sync --description "Rate limiting middleware"
+# Before-tool hook
+fips-agents generate middleware rate_limiter --hook-type before_tool
+
+# Error handler (sync)
+fips-agents generate middleware error_reporter --hook-type on_error --sync
 ```
 
 #### Parameters JSON Schema
 
-When using `--params` flag, provide a JSON file with parameter definitions:
+When using `--params` with `generate tool` or `generate prompt`, provide a JSON file defining parameter names, types, and constraints:
 
 ```json
 [
@@ -361,6 +425,64 @@ When using `--params` flag, provide a JSON file with parameter definitions:
 - `pattern` (for regex validation on strings)
 - `default` (default value when optional)
 
+---
+
+### Patch Commands
+
+The `patch` command group updates files in existing MCP server projects from the upstream template repository without overwriting your custom code. It shows interactive diffs for files that may contain customizations.
+
+Run these commands from within your project directory.
+
+#### `patch check`
+
+```bash
+fips-agents patch check
+```
+
+Check for available template updates. Shows what files have changed in the template since your project was created, organized by category.
+
+#### `patch generators`
+
+```bash
+fips-agents patch generators [--dry-run]
+```
+
+Update code generator templates (Jinja2 templates in `.fips-agents-cli/generators/`).
+
+#### `patch core`
+
+```bash
+fips-agents patch core [--dry-run]
+```
+
+Update core infrastructure files (loaders, server bootstrap).
+
+#### `patch docs`
+
+```bash
+fips-agents patch docs [--dry-run]
+```
+
+Update documentation files and examples.
+
+#### `patch build`
+
+```bash
+fips-agents patch build [--dry-run]
+```
+
+Update build and deployment files (Makefile, Containerfile).
+
+#### `patch all`
+
+```bash
+fips-agents patch all [--dry-run] [--skip-confirmation]
+```
+
+Update all patchable file categories at once. Prompts for confirmation before starting unless `--skip-confirmation` is passed.
+
+All patch subcommands (except `check`) accept `--dry-run` to preview changes without modifying files.
+
 ## Project Name Requirements
 
 Project names must follow these rules:
@@ -374,24 +496,34 @@ Project names must follow these rules:
 
 ## After Creating a Project
 
-Once your project is created, follow these steps:
+### MCP Server
 
 ```bash
-# 1. Navigate to your project
 cd my-mcp-server
-
-# 2. Create and activate virtual environment
 python -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# 3. Install the project
+source venv/bin/activate
 pip install -e .[dev]
-
-# 4. Run tests
 pytest
+# Start developing in src/my_mcp_server/
+```
 
-# 5. Start developing!
-# Edit src/my_mcp_server/ files to add your functionality
+### AI Agent
+
+```bash
+cd my-research-agent
+python -m venv venv
+source venv/bin/activate
+pip install -e .[dev]
+pytest
+# See AGENTS.md for the /plan-agent slash command workflow
+```
+
+### ModelCar
+
+```bash
+cd granite-3.1-2b-instruct
+./download.sh        # Download model weights
+./build-and-push.sh  # Build container and push to registry
 ```
 
 ## Development
@@ -535,9 +667,22 @@ If template cloning fails:
 - Verify the template repository is accessible: https://github.com/rdwj/mcp-server-template
 - Try again later if GitHub is experiencing issues
 
+### Agent template clone fails
+
+If cloning the agent template fails:
+- The agent template is in a monorepo at https://github.com/redhat-ai-americas/agent-template
+- Verify the repository is accessible and the `templates/agent-loop/` subdirectory exists
+- Check that you have access to the organization's repositories
+
+### ModelCar validation errors
+
+- **Invalid HuggingFace repo**: Use either a full URL (`https://huggingface.co/org/model`) or a short ID (`org/model`)
+- **Invalid Quay URI**: Must include a tag (e.g., `quay.io/user/repo:tag`), not just `quay.io/user/repo`
+- **Registry login**: The CLI checks for `podman login` status; run `podman login quay.io` if prompted
+
 ### "Not in an MCP server project directory"
 
-When using `generate` commands:
+When using `generate` or `patch` commands:
 - Ensure you're running the command from within an MCP server project
 - Check that `pyproject.toml` exists with `fastmcp` dependency
 - If the project wasn't created with `fips-agents create mcp-server`, generator templates may be missing
