@@ -171,6 +171,65 @@ class TestCustomizeAgentProject:
         assert 'image.title="my-agent"' in content
         assert "agent-template" not in content
 
+    def test_updates_helm_helpers(self, temp_dir):
+        """Test that Helm _helpers.tpl define names are updated."""
+        project = temp_dir / "my-agent"
+        self._create_agent_template(project)
+        templates_dir = project / "chart" / "templates"
+        templates_dir.mkdir(parents=True)
+        (templates_dir / "_helpers.tpl").write_text(
+            '{{- define "agent-template.name" -}}\n'
+            '{{- define "agent-template.fullname" -}}\n'
+            '{{- define "agent-template.labels" -}}\n'
+        )
+
+        customize_agent_project(project, "my-agent")
+
+        content = (templates_dir / "_helpers.tpl").read_text()
+        assert "agent-template" not in content
+        assert '"my-agent.name"' in content
+        assert '"my-agent.fullname"' in content
+
+    def test_updates_deploy_sh(self, temp_dir):
+        """Test that deploy.sh agent-template references are updated."""
+        project = temp_dir / "my-agent"
+        self._create_agent_template(project)
+        (project / "deploy.sh").write_text("helm upgrade --install agent-template chart/\n")
+
+        customize_agent_project(project, "my-agent")
+
+        content = (project / "deploy.sh").read_text()
+        assert "agent-template" not in content
+
+    def test_replaces_owner_repo_with_github(self, temp_dir):
+        """Test that OWNER/REPO is replaced with github_repo when provided."""
+        project = temp_dir / "my-agent"
+        self._create_agent_template(project)
+        (project / "Containerfile").write_text(
+            'LABEL io.opencontainers.image.title="agent-template"\n'
+            '      io.opencontainers.image.source="https://github.com/OWNER/REPO"\n'
+        )
+
+        customize_agent_project(project, "my-agent", github_repo="rdwj/my-agent")
+
+        content = (project / "Containerfile").read_text()
+        assert "OWNER/REPO" not in content
+        assert "rdwj/my-agent" in content
+
+    def test_replaces_owner_repo_without_github(self, temp_dir):
+        """Test that OWNER/REPO gets a helpful placeholder when no github_repo."""
+        project = temp_dir / "my-agent"
+        self._create_agent_template(project)
+        (project / "Containerfile").write_text(
+            'LABEL io.opencontainers.image.source="https://github.com/OWNER/REPO"\n'
+        )
+
+        customize_agent_project(project, "my-agent")
+
+        content = (project / "Containerfile").read_text()
+        assert "OWNER/REPO" not in content
+        assert "OWNER/my-agent" in content
+
     def test_missing_pyproject_raises_error(self, temp_dir):
         """Test that missing pyproject.toml raises FileNotFoundError."""
         project = temp_dir / "my-agent"

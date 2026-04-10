@@ -510,7 +510,7 @@ def agent(
         ) as progress:
             progress.add_task(description="Customizing project...", total=None)
             try:
-                customize_agent_project(target_path, project_name)
+                customize_agent_project(target_path, project_name, github_repo=github_repo)
                 cleanup_template_files(target_path)
                 if template_commit:
                     write_template_info(

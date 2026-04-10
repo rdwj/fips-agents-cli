@@ -152,17 +152,23 @@ def _replace_in_file(path: Path, old: str, new: str) -> None:
         path.write_text(text.replace(old, new))
 
 
-def customize_agent_project(project_path: Path, new_name: str) -> None:
+def customize_agent_project(
+    project_path: Path,
+    new_name: str,
+    github_repo: str | None = None,
+) -> None:
     """
     Customize an agent project with the new project name.
 
     Replaces 'agent-template' with the new project name across configuration
-    files. Unlike MCP server projects, agent projects don't rename source
-    directories (base_agent is a framework component, not the project module).
+    files, Helm templates, and deploy scripts. Unlike MCP server projects,
+    agent projects don't rename source directories (base_agent is a framework
+    component, not the project module).
 
     Args:
         project_path: Path to the project root directory
         new_name: The new project name (with hyphens allowed)
+        github_repo: GitHub repo in "owner/name" format for Containerfile label
 
     Raises:
         FileNotFoundError: If pyproject.toml doesn't exist
@@ -186,19 +192,31 @@ def customize_agent_project(project_path: Path, new_name: str) -> None:
 
         console.print("[green]✓[/green] Updated pyproject.toml")
 
-        # 2. String-replace "agent-template" in supporting files
+        # 2. String-replace "agent-template" in supporting files and Helm templates
         files_to_update = [
             project_path / "chart" / "Chart.yaml",
             project_path / "chart" / "values.yaml",
+            project_path / "chart" / "templates" / "_helpers.tpl",
+            project_path / "chart" / "templates" / "deployment.yaml",
+            project_path / "chart" / "templates" / "service.yaml",
+            project_path / "chart" / "templates" / "configmap.yaml",
+            project_path / "chart" / "templates" / "route.yaml",
+            project_path / "chart" / "templates" / "NOTES.txt",
             project_path / "AGENTS.md",
             project_path / "Containerfile",
             project_path / "Makefile",
+            project_path / "deploy.sh",
         ]
 
         for file_path in files_to_update:
             _replace_in_file(file_path, "agent-template", new_name)
 
         console.print("[green]✓[/green] Updated configuration files")
+
+        # 3. Replace OWNER/REPO placeholder in Containerfile image source label
+        repo_value = github_repo if github_repo else f"OWNER/{new_name}"
+        _replace_in_file(project_path / "Containerfile", "OWNER/REPO", repo_value)
+
         console.print("[green]✓[/green] Agent project customization complete")
 
     except FileNotFoundError as e:
