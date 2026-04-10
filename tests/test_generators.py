@@ -304,12 +304,10 @@ class TestRunComponentTests:
         """Test running tests that pass."""
         # Create a simple passing test
         test_file = tmp_path / "test_example.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def test_passing():
     assert True
-"""
-        )
+""")
 
         success, output = run_component_tests(tmp_path, test_file)
 
@@ -322,12 +320,10 @@ def test_passing():
         """Test running tests that fail."""
         # Create a failing test
         test_file = tmp_path / "test_example.py"
-        test_file.write_text(
-            """
+        test_file.write_text("""
 def test_failing():
     assert False, "This test should fail"
-"""
-        )
+""")
 
         success, output = run_component_tests(tmp_path, test_file)
 
