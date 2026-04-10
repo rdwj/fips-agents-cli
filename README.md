@@ -5,7 +5,7 @@ A command-line tool for creating and managing FIPS-compliant AI agent projects. 
 ## Features
 
 - 🚀 Quick project scaffolding from templates
-- 📦 MCP server, AI agent, and ModelCar project generation
+- 📦 MCP server, AI agent, Go gateway, chat UI, and ModelCar project generation
 - 🔧 Automatic project customization (pyproject.toml, module names, entry points)
 - ⚡ Component generation (tools, resources, prompts, middleware) with Jinja2 templates
 - 🎨 Beautiful CLI output with Rich
@@ -67,6 +67,12 @@ fips-agents create mcp-server my-mcp-server
 # AI agent
 fips-agents create agent my-research-agent
 
+# Go HTTP gateway (proxies to an agent backend)
+fips-agents create gateway my-gateway
+
+# Chat UI (connects to a gateway or agent)
+fips-agents create ui my-chat-ui
+
 # ModelCar (HuggingFace model as container)
 fips-agents create model-car ibm-granite/granite-3.1-2b-instruct \
     quay.io/user/models:granite-3.1-2b-instruct
@@ -110,9 +116,9 @@ fips-agents patch --help
 
 The `create` command group scaffolds new projects from templates.
 
-#### Shared Options (mcp-server and agent)
+#### Shared Options (mcp-server, agent, gateway, ui)
 
-Both `create mcp-server` and `create agent` accept the same options:
+All `create` subcommands (except `model-car`) accept the same options:
 
 | Option | Description |
 |--------|-------------|
@@ -184,6 +190,54 @@ fips-agents create agent my-agent --github --org redhat-ai-americas
 
 # Non-interactive mode
 fips-agents create agent my-agent --yes --local
+```
+
+#### `create gateway`
+
+```bash
+fips-agents create gateway <project-name> [OPTIONS]
+```
+
+Creates a Go HTTP gateway project from the [gateway-template](https://github.com/redhat-ai-americas/gateway-template) repository. The gateway proxies OpenAI-compatible `/v1/chat/completions` requests to an agent backend, with SSE streaming support, heartbeat keepalives, health/readiness probes, and an A2A agent discovery card.
+
+**Arguments:**
+
+- `project-name` — Name for your gateway project
+
+**Options:** Same shared options as above.
+
+**Examples:**
+
+```bash
+# Create gateway project
+fips-agents create gateway my-gateway
+
+# Create with GitHub repo
+fips-agents create gateway my-gateway --github --org my-org
+```
+
+#### `create ui`
+
+```bash
+fips-agents create ui <project-name> [OPTIONS]
+```
+
+Creates a chat UI project from the [ui-template](https://github.com/redhat-ai-americas/ui-template) repository. A Go server with embedded HTML/CSS/JS that provides a browser-based chat interface. Includes a built-in reverse proxy to the backend API, SSE streaming, and markdown rendering.
+
+**Arguments:**
+
+- `project-name` — Name for your UI project
+
+**Options:** Same shared options as above.
+
+**Examples:**
+
+```bash
+# Create UI project
+fips-agents create ui my-chat-ui
+
+# Create with GitHub repo
+fips-agents create ui my-chat-ui --github --private
 ```
 
 #### `create model-car`
@@ -518,6 +572,26 @@ pytest
 # See AGENTS.md for the /plan-agent slash command workflow
 ```
 
+### Gateway
+
+```bash
+cd my-gateway
+make build           # Build the Go binary
+make run             # Run locally (set BACKEND_URL to your agent)
+make build-openshift PROJECT=my-gateway  # Build on OpenShift
+make deploy PROJECT=my-gateway           # Deploy via Helm
+```
+
+### Chat UI
+
+```bash
+cd my-chat-ui
+make build           # Build the Go binary
+make run             # Run locally (set API_URL to your gateway/agent)
+make build-openshift PROJECT=my-chat-ui  # Build on OpenShift
+make deploy PROJECT=my-chat-ui           # Deploy via Helm
+```
+
 ### ModelCar
 
 ```bash
@@ -592,7 +666,7 @@ fips-agents-cli/
 │       ├── cli.py          # Main CLI application
 │       ├── version.py      # Version information
 │       ├── commands/       # CLI command implementations
-│       │   ├── create.py   # create mcp-server, create agent
+│       │   ├── create.py   # create mcp-server, agent, gateway, ui
 │       │   ├── generate.py # generate tool/resource/prompt/middleware
 │       │   ├── model_car.py # create model-car
 │       │   └── patch.py    # patch command
@@ -713,6 +787,14 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.5.0
+
+- Feature: Added `create gateway` command for scaffolding Go HTTP gateway projects from the gateway-template
+- Feature: Added `create ui` command for scaffolding chat UI projects from the ui-template
+- Feature: Go project customization pipeline (`customize_go_project`) handles go.mod, Helm charts, Containerfile, Makefile, and static HTML
+- Fix: Agent scaffolding now replaces `agent-template` in all Helm chart templates, preventing resource name collisions
+- Fix: Agent scaffolding now replaces `OWNER/REPO` placeholder in Containerfile with actual GitHub repo
 
 ### Version 0.4.0
 
