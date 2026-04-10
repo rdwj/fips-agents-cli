@@ -1,11 +1,11 @@
 # FIPS Agents CLI
 
-A command-line tool for creating and managing FIPS-compliant AI agent projects, with a focus on MCP (Model Context Protocol) server development.
+A command-line tool for creating and managing FIPS-compliant AI agent projects. Scaffolds MCP (Model Context Protocol) servers and AI agent projects from production-ready templates.
 
 ## Features
 
 - 🚀 Quick project scaffolding from templates
-- 📦 MCP server project generation
+- 📦 MCP server and AI agent project generation
 - 🔧 Automatic project customization
 - ⚡ Component generation (tools, resources, prompts, middleware)
 - 🎨 Beautiful CLI output with Rich
@@ -81,6 +81,24 @@ fips-agents create mcp-server my-server --target-dir ~/projects
 fips-agents create mcp-server my-server --no-git
 ```
 
+### Create a new AI agent project
+
+```bash
+fips-agents create agent my-research-agent
+```
+
+This will:
+1. Clone the agent template (from the agent-template monorepo)
+2. Customize the project with your chosen name
+3. Initialize a git repository
+4. Provide next steps including the `/plan-agent` slash command
+
+### Create with GitHub and deploy to OpenShift
+
+```bash
+fips-agents create agent my-agent --github --org my-org
+```
+
 ### Generate components in an existing project
 
 ```bash
@@ -112,6 +130,7 @@ fips-agents --version
 fips-agents --help
 fips-agents create --help
 fips-agents create mcp-server --help
+fips-agents create agent --help
 fips-agents generate --help
 fips-agents generate tool --help
 ```
@@ -141,6 +160,43 @@ fips-agents create mcp-server my-server -t ~/projects
 
 # Create without git initialization
 fips-agents create mcp-server my-server --no-git
+```
+
+### Create Agent
+
+```bash
+fips-agents create agent <project-name> [OPTIONS]
+```
+
+**Arguments:**
+- `project-name`: Name for your agent project (must start with lowercase letter, contain only lowercase letters, numbers, hyphens, and underscores)
+
+**Options:**
+- `--target-dir, -t PATH`: Target directory for the project (default: current directory)
+- `--no-git`: Skip git repository initialization
+- `--github`: Create GitHub repository and push code
+- `--local`: Create local project only (skip GitHub)
+- `--yes, -y`: Non-interactive mode (use defaults, skip prompts)
+- `--private`: Make GitHub repository private
+- `--org TEXT`: GitHub organization to create repository in
+- `--description, -d TEXT`: GitHub repository description
+- `--remote-only`: Create GitHub repo only, don't clone locally
+- `--help`: Show help message
+
+**Examples:**
+
+```bash
+# Create in current directory
+fips-agents create agent my-research-agent
+
+# Create with GitHub repo in an organization
+fips-agents create agent my-agent --github --org redhat-ai-americas
+
+# Create without git initialization
+fips-agents create agent my-agent --no-git
+
+# Non-interactive mode
+fips-agents create agent my-agent --yes
 ```
 
 ### Generate Components
@@ -390,27 +446,45 @@ mypy src
 fips-agents-cli/
 ├── pyproject.toml          # Project configuration
 ├── README.md               # This file
+├── CLAUDE.md               # Claude Code developer instructions
+├── RELEASE_CHECKLIST.md    # Release procedures
+├── docs/                   # User-facing documentation
+├── planning/               # Design and implementation plans
+├── research/               # Technology evaluations
+├── retrospectives/         # Post-effort retrospectives
+├── scripts/                # Automation scripts
 ├── src/
 │   └── fips_agents_cli/
-│       ├── __init__.py     # Package initialization
+│       ├── __init__.py
 │       ├── __main__.py     # Entry point for python -m
 │       ├── cli.py          # Main CLI application
 │       ├── version.py      # Version information
 │       ├── commands/       # CLI command implementations
-│       │   ├── __init__.py
-│       │   └── create.py   # Create command
+│       │   ├── create.py   # create mcp-server, create agent
+│       │   ├── generate.py # generate tool/resource/prompt/middleware
+│       │   ├── model_car.py # create model-car
+│       │   └── patch.py    # patch command
 │       └── tools/          # Utility modules
-│           ├── __init__.py
-│           ├── filesystem.py  # Filesystem operations
-│           ├── git.py         # Git operations
-│           └── project.py     # Project customization
-└── tests/                  # Test suite
-    ├── __init__.py
+│           ├── filesystem.py
+│           ├── git.py
+│           ├── github.py
+│           ├── project.py
+│           └── validation.py
+└── tests/
     ├── conftest.py         # Pytest fixtures
     ├── test_create.py      # Create command tests
-    ├── test_filesystem.py  # Filesystem utilities tests
-    └── test_project.py     # Project utilities tests
+    ├── test_project.py     # Project utilities tests
+    └── ...
 ```
+
+## Documentation
+
+- **[docs/](docs/)** — User-facing reference: publishing guides, release procedures
+- **[planning/](planning/)** — Design documents and implementation plans for upcoming features
+- **[research/](research/)** — Technology evaluations and architectural analysis
+- **[retrospectives/](retrospectives/)** — Post-effort retrospectives
+
+See [docs/README.md](docs/README.md) for a full index.
 
 ## Requirements
 
@@ -494,6 +568,13 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.4.0
+
+- Feature: Added `create agent` command for scaffolding AI agent projects from the agent-loop template
+- Feature: New `clone_template_subdir()` utility for extracting templates from monorepos
+- Feature: Agent project customization across pyproject.toml, Helm chart, Makefile, Containerfile, and AGENTS.md
+- Improvement: Reorganized documentation into docs/, planning/, and research/ directories
 
 ### Version 0.3.0
 

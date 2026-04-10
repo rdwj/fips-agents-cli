@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**fips-agents-cli** is a Python-based CLI tool for scaffolding FIPS-compliant AI agent projects, with initial focus on MCP (Model Context Protocol) server development. The tool clones template repositories, customizes them for new projects, and prepares them for immediate development use.
+**fips-agents-cli** is a Python-based CLI tool for scaffolding FIPS-compliant AI agent projects. It scaffolds MCP (Model Context Protocol) servers and AI agent projects from production-ready templates, customizes them for new projects, and prepares them for immediate development use.
 
-**Current Status:** MVP implementation complete with `create mcp-server` command.
+**Current Status:** `create mcp-server` and `create agent` commands implemented.
 
 ## Development Commands
 
@@ -125,13 +125,24 @@ The CLI follows a layered architecture:
 - User customization via template forks
 - Minimal CLI package size
 
-**Project Customization Pipeline**: When creating projects, the tool follows this sequence:
+Two cloning strategies exist:
+- **Standalone repos** (`clone_template`): Used for MCP servers — clones the entire repo as the project root.
+- **Monorepo subdirectory** (`clone_template_subdir`): Used for agents — clones a monorepo to a temp directory, extracts a specific subdirectory, and cleans up.
+
+**MCP Server Customization Pipeline** (`update_project_name`):
 1. Clone template repository (shallow clone, depth=1)
 2. Remove template's `.git` directory
 3. Update `pyproject.toml` with new project name
 4. Rename source directory (`template_name` → `project_name` with underscores)
 5. Update entry point scripts in `pyproject.toml`
 6. Initialize fresh git repository with initial commit
+
+**Agent Customization Pipeline** (`customize_agent_project`):
+1. Clone monorepo, extract `templates/agent-loop/` subdirectory
+2. Update `pyproject.toml` name field via tomlkit
+3. String-replace `agent-template` → new name in Chart.yaml, values.yaml, AGENTS.md, Containerfile, Makefile
+4. Source directories are NOT renamed — `base_agent` is a framework component
+5. Initialize fresh git repository with initial commit
 
 **Rich Console Output**: All user-facing output uses Rich library for:
 - Colored output (green checkmarks, red errors, yellow warnings)
@@ -253,11 +264,18 @@ def test_something(temp_dir):
 
 ### Template Repository Structure
 
-The CLI expects templates to have:
+**MCP Server Template** (`rdwj/mcp-server-template` — standalone repo):
 - `pyproject.toml` with project name and entry points
-- `src/{module_name}/` source directory
-- `.fips-agents-cli/generators/` (optional, for Phase 2 generate commands)
+- `src/{module_name}/` source directory (renamed during customization)
+- `.fips-agents-cli/generators/` for generate commands
 - Standard Python project structure
+
+**Agent Template** (`redhat-ai-americas/agent-template` — monorepo, `templates/agent-loop/`):
+- `pyproject.toml` with project name (no entry point scripts)
+- `src/base_agent/` framework (NOT renamed during customization)
+- `chart/` Helm chart for OpenShift deployment
+- `agent.yaml` configuration (customized via `/plan-agent`, not during scaffolding)
+- `.claude/commands/` with agent development slash commands
 
 ### Project Name Validation
 
@@ -277,23 +295,11 @@ Examples:
 - Conversion: `project_name.replace("-", "_")`
 - This matters for imports and directory names
 
-## Future Roadmap Context
+## Implementation Notes
 
-### Phase 2 (Next): Generate Command
-
-The `generate` command will:
-- Load generator templates from `.fips-agents-cli/generators/` in projects
-- Use Jinja2 for template rendering
-- Support tool, prompt, and resource generation
-- Interactive prompts for parameters
-
-Template location strategy: Generators are copied into projects during creation (not kept in CLI), allowing per-project customization.
-
-### Why This Matters Now
-
-- Don't remove `.fips-agents-cli/` directories during template cloning
-- Test fixtures already include generator directory structure
-- Project customization must preserve these directories
+- Don't remove `.fips-agents-cli/` directories during MCP template cloning — they contain generator templates
+- Agent template customization uses string replacement, NOT source directory renaming
+- The agent template repo is a monorepo — `clone_template_subdir` handles the extraction
 
 ## Troubleshooting Common Issues
 
@@ -322,7 +328,8 @@ Common causes:
 ## Repository-Specific Notes
 
 - The main branch is `main` (not `master`)
-- Template URL is hardcoded to `https://github.com/rdwj/mcp-server-template`
+- MCP template URL: `https://github.com/rdwj/mcp-server-template`
+- Agent template URL: `https://github.com/redhat-ai-americas/agent-template` (monorepo, subdir `templates/agent-loop`)
 - Package name on PyPI: `fips-agents-cli`
 - Command name: `fips-agents` (no `-cli` suffix)
 - Recommended installation: `pipx install fips-agents-cli`
