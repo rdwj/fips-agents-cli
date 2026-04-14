@@ -227,6 +227,105 @@ def customize_agent_project(
         raise
 
 
+def customize_workflow_project(
+    project_path: Path,
+    new_name: str,
+    github_repo: str | None = None,
+) -> None:
+    """
+    Customize a workflow project with the new project name.
+
+    Replaces 'workflow-template' with the new project name across configuration
+    files, Helm templates, and deploy scripts. Also removes the monorepo-specific
+    base-agent install line from the Makefile since cloned projects get fipsagents
+    from PyPI.
+
+    Args:
+        project_path: Path to the project root directory
+        new_name: The new project name (with hyphens allowed)
+        github_repo: GitHub repo in "owner/name" format for Containerfile label
+
+    Raises:
+        FileNotFoundError: If pyproject.toml doesn't exist
+    """
+    try:
+        console.print(f"[cyan]Customizing workflow project for '{new_name}'...[/cyan]")
+
+        # 1. Update pyproject.toml name field (use tomlkit to preserve formatting)
+        pyproject_path = project_path / "pyproject.toml"
+        if not pyproject_path.exists():
+            raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
+
+        with open(pyproject_path) as f:
+            pyproject = tomlkit.parse(f.read())
+
+        if "project" in pyproject:
+            pyproject["project"]["name"] = new_name
+
+        with open(pyproject_path, "w") as f:
+            f.write(tomlkit.dumps(pyproject))
+
+        console.print("[green]✓[/green] Updated pyproject.toml")
+
+        # 2. String-replace "workflow-template" in supporting files and Helm templates
+        files_to_update = [
+            project_path / "chart" / "Chart.yaml",
+            project_path / "chart" / "values.yaml",
+            project_path / "chart" / "templates" / "_helpers.tpl",
+            project_path / "chart" / "templates" / "deployment.yaml",
+            project_path / "chart" / "templates" / "service.yaml",
+            project_path / "chart" / "templates" / "configmap.yaml",
+            project_path / "chart" / "templates" / "route.yaml",
+            project_path / "chart" / "templates" / "NOTES.txt",
+            project_path / "AGENTS.md",
+            project_path / "Containerfile",
+            project_path / "Makefile",
+            project_path / "deploy.sh",
+        ]
+
+        for file_path in files_to_update:
+            _replace_in_file(file_path, "workflow-template", new_name)
+
+        console.print("[green]✓[/green] Updated configuration files")
+
+        # 3. Remove monorepo-specific base-agent install line from Makefile
+        # Cloned projects get fipsagents from PyPI, not a local path
+        makefile_path = project_path / "Makefile"
+        if makefile_path.exists():
+            text = makefile_path.read_text()
+            # Remove the monorepo install line and its comments
+            lines = text.splitlines(keepends=True)
+            filtered = []
+            skip_block = False
+            for line in lines:
+                if "In the monorepo" in line:
+                    skip_block = True
+                    continue
+                if skip_block and ("fips-agents" in line or "scaffolding step" in line):
+                    continue
+                if skip_block and ("$(PIP) install -e" in line and "packages/" in line):
+                    skip_block = False
+                    continue
+                skip_block = False
+                filtered.append(line)
+            makefile_path.write_text("".join(filtered))
+
+        console.print("[green]✓[/green] Cleaned up Makefile for standalone use")
+
+        # 4. Replace OWNER/REPO placeholder in Containerfile image source label
+        repo_value = github_repo if github_repo else f"OWNER/{new_name}"
+        _replace_in_file(project_path / "Containerfile", "OWNER/REPO", repo_value)
+
+        console.print("[green]✓[/green] Workflow project customization complete")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        raise
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to customize workflow project: {e}")
+        raise
+
+
 def customize_go_project(project_path: Path, new_name: str, sentinel: str) -> None:
     """
     Customize a Go-based template project with the new project name.
