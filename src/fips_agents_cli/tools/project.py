@@ -326,6 +326,82 @@ def customize_workflow_project(
         raise
 
 
+def customize_sandbox_project(
+    project_path: Path,
+    new_name: str,
+    github_repo: str | None = None,
+) -> None:
+    """
+    Customize a sandbox project with the new project name.
+
+    Replaces 'code-sandbox' with the new project name across configuration
+    files, Helm templates, and build files. The Python package directory
+    (sandbox/) is NOT renamed -- it stays as 'sandbox' regardless of
+    project name.
+
+    Args:
+        project_path: Path to the project root directory
+        new_name: The new project name (with hyphens allowed)
+        github_repo: GitHub repo in "owner/name" format for Containerfile label
+
+    Raises:
+        FileNotFoundError: If pyproject.toml doesn't exist
+    """
+    try:
+        console.print(f"[cyan]Customizing sandbox project for '{new_name}'...[/cyan]")
+
+        # 1. Update pyproject.toml name field (use tomlkit to preserve formatting)
+        pyproject_path = project_path / "pyproject.toml"
+        if not pyproject_path.exists():
+            raise FileNotFoundError(f"pyproject.toml not found at {pyproject_path}")
+
+        with open(pyproject_path) as f:
+            pyproject = tomlkit.parse(f.read())
+
+        if "project" in pyproject:
+            pyproject["project"]["name"] = new_name
+
+        with open(pyproject_path, "w") as f:
+            f.write(tomlkit.dumps(pyproject))
+
+        console.print("[green]✓[/green] Updated pyproject.toml")
+
+        # 2. String-replace "code-sandbox" in supporting files and Helm templates
+        files_to_update = [
+            project_path / "chart" / "Chart.yaml",
+            project_path / "chart" / "values.yaml",
+            project_path / "Makefile",
+            project_path / "README.md",
+            project_path / "CLAUDE.md",
+            project_path / "Containerfile",
+        ]
+
+        # Also update all files in chart/templates/
+        chart_templates_dir = project_path / "chart" / "templates"
+        if chart_templates_dir.exists():
+            for template_file in chart_templates_dir.iterdir():
+                if template_file.is_file():
+                    files_to_update.append(template_file)
+
+        for file_path in files_to_update:
+            _replace_in_file(file_path, "code-sandbox", new_name)
+
+        console.print("[green]✓[/green] Updated configuration files")
+
+        # 3. Replace OWNER/REPO placeholder in Containerfile image source label
+        if github_repo:
+            _replace_in_file(project_path / "Containerfile", "OWNER/REPO", github_repo)
+
+        console.print("[green]✓[/green] Sandbox project customization complete")
+
+    except FileNotFoundError as e:
+        console.print(f"[red]✗[/red] {e}")
+        raise
+    except Exception as e:
+        console.print(f"[red]✗[/red] Failed to customize sandbox project: {e}")
+        raise
+
+
 def customize_go_project(project_path: Path, new_name: str, sentinel: str) -> None:
     """
     Customize a Go-based template project with the new project name.

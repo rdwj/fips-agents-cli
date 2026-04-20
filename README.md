@@ -5,7 +5,7 @@ A command-line tool for creating and managing FIPS-compliant AI agent projects. 
 ## Features
 
 - 🚀 Quick project scaffolding from templates
-- 📦 MCP server, AI agent, Go gateway, chat UI, and ModelCar project generation
+- 📦 MCP server, AI agent, Go gateway, chat UI, sandbox, and ModelCar project generation
 - 🔧 Automatic project customization (pyproject.toml, module names, entry points)
 - ⚡ Component generation (tools, resources, prompts, middleware) with Jinja2 templates
 - 🎨 Beautiful CLI output with Rich
@@ -72,6 +72,9 @@ fips-agents create gateway my-gateway
 
 # Chat UI (connects to a gateway or agent)
 fips-agents create ui my-chat-ui
+
+# Code execution sandbox (sidecar for agents)
+fips-agents create sandbox my-sandbox
 
 # ModelCar (HuggingFace model as container)
 fips-agents create model-car ibm-granite/granite-3.1-2b-instruct \
@@ -238,6 +241,33 @@ fips-agents create ui my-chat-ui
 
 # Create with GitHub repo
 fips-agents create ui my-chat-ui --github --private
+```
+
+#### `create sandbox`
+
+```bash
+fips-agents create sandbox <project-name> [OPTIONS]
+```
+
+Creates a code execution sandbox project from the [code-sandbox](https://github.com/fips-agents/code-sandbox) repository. The sandbox provides a FastAPI-based sidecar for secure code execution inside agent pods, with multiple language profiles (base, data-science).
+
+**Arguments:**
+
+- `project-name` -- Name for your sandbox project
+
+**Options:** Same shared options as above.
+
+**Examples:**
+
+```bash
+# Create sandbox project
+fips-agents create sandbox my-sandbox
+
+# Create with GitHub repo
+fips-agents create sandbox my-sandbox --github --private
+
+# Non-interactive mode
+fips-agents create sandbox my-sandbox --yes --local
 ```
 
 #### `create model-car`
@@ -590,6 +620,16 @@ make build           # Build the Go binary
 make run             # Run locally (set API_URL to your gateway/agent)
 make build-openshift PROJECT=my-chat-ui  # Build on OpenShift
 make deploy PROJECT=my-chat-ui           # Deploy via Helm
+```
+
+### Sandbox
+
+```bash
+cd my-sandbox
+make install             # Install dependencies
+make test                # Run tests
+make build               # Build container
+make build PROFILE=data-science  # Build with profile
 ```
 
 ### ModelCar
