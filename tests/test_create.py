@@ -913,7 +913,7 @@ class TestCreateGateway:
         mock_clone.assert_called_once()
         # Verify the URL passed to clone_template
         call_args = mock_clone.call_args
-        assert call_args[0][0] == "https://github.com/redhat-ai-americas/gateway-template"
+        assert call_args[0][0] == "https://github.com/fips-agents/gateway-template"
         assert mock_customize.called
         assert mock_cleanup.called
         assert mock_init_repo.called
@@ -971,7 +971,7 @@ class TestCreateUi:
 
         assert mock_clone.called
         call_args = mock_clone.call_args
-        assert call_args[0][0] == "https://github.com/redhat-ai-americas/ui-template"
+        assert call_args[0][0] == "https://github.com/fips-agents/ui-template"
         assert mock_customize.called
         assert mock_cleanup.called
         assert mock_init_repo.called
