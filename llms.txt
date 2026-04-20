@@ -4,30 +4,30 @@
 
 ## Start here
 
-- [README](https://github.com/rdwj/fips-agents-cli/blob/main/README.md): Installation, quick start, full command reference, and changelog
-- [CLAUDE.md](https://github.com/rdwj/fips-agents-cli/blob/main/CLAUDE.md): Developer instructions, architecture, testing patterns, and project conventions
+- [README](https://github.com/fips-agents/fips-agents-cli/blob/main/README.md): Installation, quick start, full command reference, and changelog
+- [CLAUDE.md](https://github.com/fips-agents/fips-agents-cli/blob/main/CLAUDE.md): Developer instructions, architecture, testing patterns, and project conventions
 
 ## Commands
 
-- [create.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/commands/create.py): `create mcp-server` and `create agent` — scaffold projects from templates
-- [generate.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/commands/generate.py): `generate tool/resource/prompt/middleware` — add components to MCP server projects
-- [model_car.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/commands/model_car.py): `create model-car` — scaffold ModelCar container projects
-- [patch.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/commands/patch.py): `patch` — selective template updates without losing custom code
+- [create.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/commands/create.py): `create mcp-server` and `create agent` — scaffold projects from templates
+- [generate.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/commands/generate.py): `generate tool/resource/prompt/middleware` — add components to MCP server projects
+- [model_car.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/commands/model_car.py): `create model-car` — scaffold ModelCar container projects
+- [patch.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/commands/patch.py): `patch` — selective template updates without losing custom code
 
 ## Utilities
 
-- [git.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/tools/git.py): Template cloning (full repo and monorepo subdirectory extraction), git init, remote management
-- [project.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/tools/project.py): Project name validation, customization pipelines for MCP and agent templates
-- [github.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/tools/github.py): GitHub CLI integration for repo creation and push
-- [filesystem.py](https://github.com/rdwj/fips-agents-cli/blob/main/src/fips_agents_cli/tools/filesystem.py): Path resolution and directory validation
+- [git.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/tools/git.py): Template cloning (full repo and monorepo subdirectory extraction), git init, remote management
+- [project.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/tools/project.py): Project name validation, customization pipelines for MCP and agent templates
+- [github.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/tools/github.py): GitHub CLI integration for repo creation and push
+- [filesystem.py](https://github.com/fips-agents/fips-agents-cli/blob/main/src/fips_agents_cli/tools/filesystem.py): Path resolution and directory validation
 
 ## Documentation
 
-- [docs/](https://github.com/rdwj/fips-agents-cli/tree/main/docs): Publishing guides for PyPI
-- [planning/](https://github.com/rdwj/fips-agents-cli/tree/main/planning): Design documents and implementation plans
-- [research/](https://github.com/rdwj/fips-agents-cli/tree/main/research): Technology evaluations (BAML, Ignite CLI architecture)
+- [docs/](https://github.com/fips-agents/fips-agents-cli/tree/main/docs): Publishing guides for PyPI
+- [planning/](https://github.com/fips-agents/fips-agents-cli/tree/main/planning): Design documents and implementation plans
+- [research/](https://github.com/fips-agents/fips-agents-cli/tree/main/research): Technology evaluations (BAML, Ignite CLI architecture)
 
 ## Release
 
-- [RELEASE_CHECKLIST.md](https://github.com/rdwj/fips-agents-cli/blob/main/RELEASE_CHECKLIST.md): Automated and manual release procedures
-- [scripts/release.sh](https://github.com/rdwj/fips-agents-cli/blob/main/scripts/release.sh): Version bump, tag, and push automation
+- [RELEASE_CHECKLIST.md](https://github.com/fips-agents/fips-agents-cli/blob/main/RELEASE_CHECKLIST.md): Automated and manual release procedures
+- [scripts/release.sh](https://github.com/fips-agents/fips-agents-cli/blob/main/scripts/release.sh): Version bump, tag, and push automation

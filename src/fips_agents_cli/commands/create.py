@@ -38,15 +38,15 @@ from fips_agents_cli.tools.project import (
 
 console = Console()
 
-# Template URL for MCP server projects
-MCP_SERVER_TEMPLATE_URL = "https://github.com/rdwj/mcp-server-template"
+# Template URLs — all repos live under github.com/fips-agents/
+MCP_SERVER_TEMPLATE_URL = "https://github.com/fips-agents/mcp-server-template"
 
-AGENT_TEMPLATE_URL = "https://github.com/redhat-ai-americas/agent-template"
+AGENT_TEMPLATE_URL = "https://github.com/fips-agents/agent-template"
 AGENT_TEMPLATE_SUBDIR = "templates/agent-loop"
 WORKFLOW_TEMPLATE_SUBDIR = "templates/workflow"
 
-GATEWAY_TEMPLATE_URL = "https://github.com/redhat-ai-americas/gateway-template"
-UI_TEMPLATE_URL = "https://github.com/redhat-ai-americas/ui-template"
+GATEWAY_TEMPLATE_URL = "https://github.com/fips-agents/gateway-template"
+UI_TEMPLATE_URL = "https://github.com/fips-agents/ui-template"
 
 SANDBOX_TEMPLATE_URL = "https://github.com/fips-agents/code-sandbox"
 

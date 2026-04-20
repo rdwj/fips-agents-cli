@@ -264,13 +264,13 @@ def test_something(temp_dir):
 
 ### Template Repository Structure
 
-**MCP Server Template** (`rdwj/mcp-server-template` — standalone repo):
+**MCP Server Template** (`fips-agents/mcp-server-template` — standalone repo):
 - `pyproject.toml` with project name and entry points
 - `src/{module_name}/` source directory (renamed during customization)
 - `.fips-agents-cli/generators/` for generate commands
 - Standard Python project structure
 
-**Agent Template** (`redhat-ai-americas/agent-template` — monorepo, `templates/agent-loop/`):
+**Agent Template** (`fips-agents/agent-template` — monorepo, `templates/agent-loop/`):
 - `pyproject.toml` with project name (no entry point scripts)
 - `src/base_agent/` framework (NOT renamed during customization)
 - `chart/` Helm chart for OpenShift deployment
@@ -328,8 +328,8 @@ Common causes:
 ## Repository-Specific Notes
 
 - The main branch is `main` (not `master`)
-- MCP template URL: `https://github.com/rdwj/mcp-server-template`
-- Agent template URL: `https://github.com/redhat-ai-americas/agent-template` (monorepo, subdir `templates/agent-loop`)
+- MCP template URL: `https://github.com/fips-agents/mcp-server-template`
+- Agent template URL: `https://github.com/fips-agents/agent-template` (monorepo, subdir `templates/agent-loop`)
 - Package name on PyPI: `fips-agents-cli`
 - Command name: `fips-agents` (no `-cli` suffix)
 - Recommended installation: `pipx install fips-agents-cli`

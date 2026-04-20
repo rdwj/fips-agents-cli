@@ -43,7 +43,7 @@ For contributing or local development:
 
 ```bash
 # Clone the repository
-git clone https://github.com/rdwj/fips-agents-cli.git
+git clone https://github.com/fips-agents/fips-agents-cli.git
 cd fips-agents-cli
 
 # Create virtual environment
@@ -143,7 +143,7 @@ When `gh` CLI is installed and authenticated, the tool prompts interactively abo
 fips-agents create mcp-server <project-name> [OPTIONS]
 ```
 
-Creates an MCP server project from the [mcp-server-template](https://github.com/rdwj/mcp-server-template) repository. The template includes FastMCP server bootstrap, component auto-discovery, Jinja2 generator templates, Makefile, Containerfile, and tests.
+Creates an MCP server project from the [mcp-server-template](https://github.com/fips-agents/mcp-server-template) repository. The template includes FastMCP server bootstrap, component auto-discovery, Jinja2 generator templates, Makefile, Containerfile, and tests.
 
 **Arguments:**
 
@@ -174,7 +174,7 @@ fips-agents create mcp-server my-server --remote-only --org my-org
 fips-agents create agent <project-name> [OPTIONS]
 ```
 
-Creates an AI agent project from the [agent-template](https://github.com/redhat-ai-americas/agent-template) monorepo (`templates/agent-loop/` subdirectory). The template includes an agent loop skeleton, Helm chart, Makefile, Containerfile, and AGENTS.md.
+Creates an AI agent project from the [agent-template](https://github.com/fips-agents/agent-template) monorepo (`templates/agent-loop/` subdirectory). The template includes an agent loop skeleton, Helm chart, Makefile, Containerfile, and AGENTS.md.
 
 **Arguments:**
 
@@ -189,7 +189,7 @@ Creates an AI agent project from the [agent-template](https://github.com/redhat-
 fips-agents create agent my-research-agent
 
 # Create with GitHub repo in an organization
-fips-agents create agent my-agent --github --org redhat-ai-americas
+fips-agents create agent my-agent --github --org fips-agents
 
 # Non-interactive mode
 fips-agents create agent my-agent --yes --local
@@ -201,7 +201,7 @@ fips-agents create agent my-agent --yes --local
 fips-agents create gateway <project-name> [OPTIONS]
 ```
 
-Creates a Go HTTP gateway project from the [gateway-template](https://github.com/redhat-ai-americas/gateway-template) repository. The gateway proxies OpenAI-compatible `/v1/chat/completions` requests to an agent backend, with SSE streaming support, heartbeat keepalives, health/readiness probes, and an A2A agent discovery card.
+Creates a Go HTTP gateway project from the [gateway-template](https://github.com/fips-agents/gateway-template) repository. The gateway proxies OpenAI-compatible `/v1/chat/completions` requests to an agent backend, with SSE streaming support, heartbeat keepalives, health/readiness probes, and an A2A agent discovery card.
 
 **Arguments:**
 
@@ -225,7 +225,7 @@ fips-agents create gateway my-gateway --github --org my-org
 fips-agents create ui <project-name> [OPTIONS]
 ```
 
-Creates a chat UI project from the [ui-template](https://github.com/redhat-ai-americas/ui-template) repository. A Go server with embedded HTML/CSS/JS that provides a browser-based chat interface. Includes a built-in reverse proxy to the backend API, SSE streaming, and markdown rendering.
+Creates a chat UI project from the [ui-template](https://github.com/fips-agents/ui-template) repository. A Go server with embedded HTML/CSS/JS that provides a browser-based chat interface. Includes a built-in reverse proxy to the backend API, SSE streaming, and markdown rendering.
 
 **Arguments:**
 
@@ -646,7 +646,7 @@ cd granite-3.1-2b-instruct
 
 ```bash
 # Clone the repository
-git clone https://github.com/rdwj/fips-agents-cli.git
+git clone https://github.com/fips-agents/fips-agents-cli.git
 cd fips-agents-cli
 
 # Create virtual environment
@@ -778,13 +778,13 @@ If you see "Directory already exists" error:
 
 If template cloning fails:
 - Check your internet connection
-- Verify the template repository is accessible: https://github.com/rdwj/mcp-server-template
+- Verify the template repository is accessible: https://github.com/fips-agents/mcp-server-template
 - Try again later if GitHub is experiencing issues
 
 ### Agent template clone fails
 
 If cloning the agent template fails:
-- The agent template is in a monorepo at https://github.com/redhat-ai-americas/agent-template
+- The agent template is in a monorepo at https://github.com/fips-agents/agent-template
 - Verify the repository is accessible and the `templates/agent-loop/` subdirectory exists
 - Check that you have access to the organization's repositories
 
@@ -822,8 +822,8 @@ MIT License - see LICENSE file for details
 
 ## Links
 
-- **Repository**: https://github.com/rdwj/fips-agents-cli
-- **Issues**: https://github.com/rdwj/fips-agents-cli/issues
+- **Repository**: https://github.com/fips-agents/fips-agents-cli
+- **Issues**: https://github.com/fips-agents/fips-agents-cli/issues
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
