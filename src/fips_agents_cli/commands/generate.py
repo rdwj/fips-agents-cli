@@ -301,7 +301,7 @@ def generate_component_workflow(
 
 @click.group()
 def generate():
-    """Generate new MCP components in existing projects."""
+    """Generate individual components (tools, prompts, resources, middleware) in existing projects."""
     pass
 
 
