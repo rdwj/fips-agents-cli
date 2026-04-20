@@ -306,7 +306,7 @@ fips-agents create model-car https://huggingface.co/ibm-granite/granite-3.1-2b-i
 
 ### Generate Commands
 
-The `generate` command group scaffolds MCP components (tools, resources, prompts, middleware) in existing MCP server projects created with `fips-agents create mcp-server`.
+The `generate` command group creates individual components (tools, resources, prompts, middleware) in existing projects.
 
 **Run these commands from within your MCP server project directory.** The CLI locates the project root by looking for `pyproject.toml` with a `fastmcp` dependency.
 
@@ -863,6 +863,31 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.7.0
+
+- Feature: New `add` command group for composable agent capabilities
+- Feature: `fips-agents add code-executor` wires sandbox code execution into existing agent projects (tool + Helm chart sidecar config)
+- Improvement: Updated `generate` group description to reflect broader scope beyond MCP
+
+### Version 0.6.2
+
+- Fix: Go project scaffolding now updates import paths in all `.go` source files
+- Fix: Go project scaffolding now updates Helm template references (`chart/templates/*.yaml`)
+
+### Version 0.6.1
+
+- Chore: Updated all project URLs from `rdwj/` to `fips-agents/` org
+- Chore: Post-transfer PyPI publishing verification release
+
+### Version 0.6.0
+
+- Feature: Added `create sandbox` command for scaffolding code execution sandbox projects from fips-agents/code-sandbox template
+- Feature: All template URLs consolidated under `github.com/fips-agents/` organization
+
+### Version 0.5.1
+
+- Fix: SSE streaming tool call ID tracking by `call_id` not array index
 
 ### Version 0.5.0
 
