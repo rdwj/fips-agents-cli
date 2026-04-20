@@ -108,6 +108,7 @@ fips-agents patch all --dry-run
 ```bash
 fips-agents --version
 fips-agents --help
+fips-agents add --help
 fips-agents create --help
 fips-agents generate --help
 fips-agents patch --help
@@ -567,6 +568,40 @@ Update all patchable file categories at once. Prompts for confirmation before st
 
 All patch subcommands (except `check`) accept `--dry-run` to preview changes without modifying files.
 
+---
+
+### Add Commands
+
+The `add` command group wires optional capabilities into existing agent projects created with `fips-agents create agent`.
+
+**Run these commands from within your agent project directory.** The CLI locates the project root by looking for `agent.yaml`.
+
+#### `add code-executor`
+
+```bash
+fips-agents add code-executor
+```
+
+Adds the `code_executor` tool to your agent's `tools/` directory and enables the sandbox sidecar in `chart/values.yaml`. The tool sends Python code to a sandbox container for isolated execution.
+
+**What it does:**
+
+1. Writes `tools/code_executor.py` with the sandbox client tool
+2. Sets `sandbox.enabled: true` in `chart/values.yaml` (if the section exists)
+3. Prints deployment guidance for sidecar and remote service modes
+
+**Deployment modes:**
+
+- **Sidecar** (default): The sandbox runs as a container in the same pod. The tool connects to `http://localhost:8000`.
+- **Remote service**: The sandbox runs as a separate deployment. Set `SANDBOX_URL` to point to it.
+
+**Example:**
+
+```bash
+cd my-research-agent
+fips-agents add code-executor
+```
+
 ## Project Name Requirements
 
 Project names must follow these rules:
@@ -706,6 +741,7 @@ fips-agents-cli/
 │       ├── cli.py          # Main CLI application
 │       ├── version.py      # Version information
 │       ├── commands/       # CLI command implementations
+│       │   ├── add.py      # add code-executor (wire capabilities)
 │       │   ├── create.py   # create mcp-server, agent, gateway, ui
 │       │   ├── generate.py # generate tool/resource/prompt/middleware
 │       │   ├── model_car.py # create model-car

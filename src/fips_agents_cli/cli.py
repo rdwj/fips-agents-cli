@@ -3,6 +3,7 @@
 import click
 from rich.console import Console
 
+from fips_agents_cli.commands.add import add
 from fips_agents_cli.commands.create import create
 from fips_agents_cli.commands.generate import generate
 from fips_agents_cli.commands.patch import patch
@@ -24,6 +25,7 @@ def cli(ctx):
 
 
 # Register commands
+cli.add_command(add)
 cli.add_command(create)
 cli.add_command(generate)
 cli.add_command(patch)
