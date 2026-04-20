@@ -150,15 +150,11 @@ def code_executor_cmd():
             values_content = values_file.read_text()
             if "sandbox:" in values_content:
                 if "enabled: false" in values_content:
-                    values_content = values_content.replace(
-                        "enabled: false", "enabled: true", 1
-                    )
+                    values_content = values_content.replace("enabled: false", "enabled: true", 1)
                     values_file.write_text(values_content)
                     console.print("[green]+[/green] Set sandbox.enabled: true in chart/values.yaml")
                 elif "enabled: true" in values_content:
-                    console.print(
-                        "[dim]sandbox.enabled already true in chart/values.yaml[/dim]"
-                    )
+                    console.print("[dim]sandbox.enabled already true in chart/values.yaml[/dim]")
                 else:
                     console.print(
                         "[yellow]Warning:[/yellow] Found sandbox: section in "
@@ -174,9 +170,7 @@ def code_executor_cmd():
                     "    image: <your-sandbox-image>[/dim]"
                 )
         else:
-            console.print(
-                "[dim]No chart/values.yaml found (not using Helm chart). Skipping.[/dim]"
-            )
+            console.print("[dim]No chart/values.yaml found (not using Helm chart). Skipping.[/dim]")
 
         # Step 5: Success panel
         next_steps = """
