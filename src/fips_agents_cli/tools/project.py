@@ -440,6 +440,17 @@ def customize_go_project(project_path: Path, new_name: str, sentinel: str) -> No
         for file_path in optional_files:
             _replace_in_file(file_path, sentinel, new_name)
 
+        # Go source files -- replace import paths in all .go files
+        for go_file in project_path.rglob("*.go"):
+            _replace_in_file(go_file, sentinel, new_name)
+        console.print("[green]✓[/green] Updated Go import paths")
+
+        # Helm chart templates -- replace helper references in all chart templates
+        chart_templates = project_path / "chart" / "templates"
+        if chart_templates.exists():
+            for tpl_file in chart_templates.glob("*.yaml"):
+                _replace_in_file(tpl_file, sentinel, new_name)
+
         # Check HTML files in static/ for sentinels (e.g. <title> tags in UI templates)
         static_dir = project_path / "static"
         if static_dir.exists():
