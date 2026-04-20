@@ -43,8 +43,8 @@ git push origin v0.1.2
 
 ### 3. Verify Release
 
-1. Check GitHub Actions: https://github.com/rdwj/fips-agents-cli/actions
-2. Verify GitHub Release: https://github.com/rdwj/fips-agents-cli/releases
+1. Check GitHub Actions: https://github.com/fips-agents/fips-agents-cli/actions
+2. Verify GitHub Release: https://github.com/fips-agents/fips-agents-cli/releases
 3. Verify on PyPI: https://pypi.org/project/fips-agents-cli/
 4. Test installation:
    ```bash
@@ -138,7 +138,7 @@ git push origin v0.1.2
 
 ### 8. Create GitHub Release
 
-1. Go to: https://github.com/rdwj/fips-agents-cli/releases/new
+1. Go to: https://github.com/fips-agents/fips-agents-cli/releases/new
 2. Select tag: `v0.1.2`
 3. Set release title: `v0.1.2`
 4. Add release notes from changelog
@@ -255,7 +255,7 @@ pytest tests/test_specific.py::test_name -v
 **Cause**: Various reasons - check workflow logs.
 
 **Solution**:
-1. Go to Actions tab: https://github.com/rdwj/fips-agents-cli/actions
+1. Go to Actions tab: https://github.com/fips-agents/fips-agents-cli/actions
 2. Click failed workflow run
 3. Check logs for error details
 4. Fix issue and push again or re-run workflow

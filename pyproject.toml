@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "fips-agents-cli"
-version = "0.6.0"
+version = "0.6.1"
 description = "CLI tool for creating and managing FIPS-compliant AI agent projects"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -44,9 +44,9 @@ dev = [
 fips-agents = "fips_agents_cli.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/rdwj/fips-agents-cli"
-Repository = "https://github.com/rdwj/fips-agents-cli"
-Issues = "https://github.com/rdwj/fips-agents-cli/issues"
+Homepage = "https://github.com/fips-agents/fips-agents-cli"
+Repository = "https://github.com/fips-agents/fips-agents-cli"
+Issues = "https://github.com/fips-agents/fips-agents-cli/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fips_agents_cli"]
