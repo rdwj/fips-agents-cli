@@ -379,6 +379,12 @@ def mcp_server(
     default=False,
     help="Create GitHub repo only, don't clone locally",
 )
+@click.option(
+    "--vendored",
+    is_flag=True,
+    default=False,
+    help="Copy fipsagents source into the project instead of using PyPI dependency",
+)
 def agent(
     project_name: str,
     target_dir: str | None,
@@ -390,6 +396,7 @@ def agent(
     org: str | None,
     repo_description: str | None,
     remote_only: bool,
+    vendored: bool,
 ):
     """
     Create a new AI agent project from template.
@@ -410,6 +417,8 @@ def agent(
         fips-agents create agent my-research-agent --local
 
         fips-agents create agent my-research-agent --yes
+
+        fips-agents create agent my-research-agent --vendored --local
     """
     try:
         # Step 1: Validate options
@@ -495,8 +504,14 @@ def agent(
         ) as progress:
             progress.add_task(description="Cloning agent template...", total=None)
             try:
+                post_clone = None
+                if vendored:
+                    from fips_agents_cli.tools.project import vendor_fipsagents_from_clone
+                    post_clone = vendor_fipsagents_from_clone
+
                 template_commit = clone_template_subdir(
-                    AGENT_TEMPLATE_URL, target_path, AGENT_TEMPLATE_SUBDIR
+                    AGENT_TEMPLATE_URL, target_path, AGENT_TEMPLATE_SUBDIR,
+                    post_clone_fn=post_clone,
                 )
             except Exception as e:
                 console.print("\n[red]✗[/red] Failed to clone agent template")
@@ -517,6 +532,9 @@ def agent(
             try:
                 customize_agent_project(target_path, project_name, github_repo=github_repo)
                 cleanup_template_files(target_path)
+                if vendored:
+                    from fips_agents_cli.tools.project import rewrite_pyproject_for_vendored
+                    rewrite_pyproject_for_vendored(target_path)
                 if template_commit:
                     write_template_info(
                         target_path,
@@ -571,6 +589,8 @@ def agent(
             github_url=github_url,
             github_repo=github_repo,
         )
+        if vendored:
+            console.print("[cyan]  Framework source vendored in src/fipsagents/[/cyan]")
 
     except KeyboardInterrupt:
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")

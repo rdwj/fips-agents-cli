@@ -60,7 +60,8 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> st
 
 
 def clone_template_subdir(
-    repo_url: str, target_path: Path, subdir: str, branch: str = "main"
+    repo_url: str, target_path: Path, subdir: str, branch: str = "main",
+    *, post_clone_fn: callable | None = None,
 ) -> str:
     """
     Clone a monorepo and extract a subdirectory as the project root.
@@ -89,6 +90,8 @@ def clone_template_subdir(
         if not src.is_dir():
             raise FileNotFoundError(f"Subdirectory '{subdir}' not found in template repo")
         shutil.copytree(src, target_path, dirs_exist_ok=True)
+        if post_clone_fn is not None:
+            post_clone_fn(tmp_path, target_path)
         return commit_hash
 
 

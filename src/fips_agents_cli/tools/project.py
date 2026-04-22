@@ -206,6 +206,7 @@ def customize_agent_project(
             project_path / "Containerfile",
             project_path / "Makefile",
             project_path / "deploy.sh",
+            project_path / "redeploy.sh",
         ]
 
         for file_path in files_to_update:
@@ -213,7 +214,31 @@ def customize_agent_project(
 
         console.print("[green]✓[/green] Updated configuration files")
 
-        # 3. Replace OWNER/REPO placeholder in Containerfile image source label
+        # 3. Remove monorepo-specific base-agent install line from Makefile
+        # Cloned projects get fipsagents from PyPI, not a local path
+        makefile_path = project_path / "Makefile"
+        if makefile_path.exists():
+            text = makefile_path.read_text()
+            # Remove the monorepo install line and its comments
+            lines = text.splitlines(keepends=True)
+            filtered = []
+            skip_block = False
+            for line in lines:
+                if "In the monorepo" in line:
+                    skip_block = True
+                    continue
+                if skip_block and ("fips-agents" in line or "scaffolding step" in line):
+                    continue
+                if skip_block and ("$(PIP) install -e" in line and "packages/" in line):
+                    skip_block = False
+                    continue
+                skip_block = False
+                filtered.append(line)
+            makefile_path.write_text("".join(filtered))
+
+        console.print("[green]✓[/green] Cleaned up Makefile for standalone use")
+
+        # 4. Replace OWNER/REPO placeholder in Containerfile image source label
         repo_value = github_repo if github_repo else f"OWNER/{new_name}"
         _replace_in_file(project_path / "Containerfile", "OWNER/REPO", repo_value)
 
@@ -541,3 +566,107 @@ def write_template_info(
     except Exception as e:
         # Don't fail the entire operation if this fails
         console.print(f"[yellow]⚠[/yellow] Could not write template info: {e}")
+
+
+def vendor_fipsagents_from_clone(
+    clone_path: Path,
+    project_path: Path,
+) -> None:
+    """
+    Copy fipsagents package source from a monorepo clone into the project.
+
+    Called as a post_clone_fn callback during clone_template_subdir() when
+    --vendored is used, or directly by 'fips-agents vendor' for post-scaffold
+    vendoring.
+
+    Args:
+        clone_path: Root of the cloned agent-template monorepo
+        project_path: Root of the target project
+    """
+    pkg_src = clone_path / "packages" / "fipsagents" / "src" / "fipsagents"
+    if not pkg_src.is_dir():
+        console.print("[red]✗[/red] fipsagents package not found in template repo")
+        raise FileNotFoundError(f"Expected fipsagents source at {pkg_src}")
+
+    dest = project_path / "src" / "fipsagents"
+
+    # Remove existing vendored source if present (for --update)
+    if dest.exists():
+        shutil.rmtree(dest)
+
+    shutil.copytree(pkg_src, dest)
+    console.print("[green]✓[/green] Copied fipsagents source to src/fipsagents/")
+
+    # Copy upstream pyproject.toml as provenance record
+    upstream_toml = clone_path / "packages" / "fipsagents" / "pyproject.toml"
+    if upstream_toml.exists():
+        shutil.copy2(upstream_toml, dest / "UPSTREAM.toml")
+
+    # Read version from the vendored package
+    version = "unknown"
+    init_file = dest / "baseagent" / "__init__.py"
+    if init_file.exists():
+        for line in init_file.read_text().splitlines():
+            if line.startswith("__version__"):
+                version = line.split("=")[1].strip().strip('"').strip("'")
+                break
+
+    # Write VENDORED marker
+    marker = dest / "VENDORED"
+    marker.write_text(
+        f"version: {version}\n"
+        f"vendored: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}\n"
+        f"source: https://github.com/fips-agents/agent-template\n"
+        f"\n"
+        f"This fipsagents source is vendored into the project.\n"
+        f"To update: fips-agents vendor --update\n"
+    )
+    console.print(f"[green]✓[/green] Wrote VENDORED marker (version {version})")
+
+
+def rewrite_pyproject_for_vendored(project_path: Path) -> None:
+    """
+    Rewrite pyproject.toml to replace fipsagents pip dependency with
+    the individual dependencies that fipsagents itself declares.
+
+    Args:
+        project_path: Root of the target project
+    """
+    pyproject_path = project_path / "pyproject.toml"
+    if not pyproject_path.exists():
+        return
+
+    with open(pyproject_path) as f:
+        pyproject = tomlkit.parse(f.read())
+
+    # Replace fipsagents[server] with its individual dependencies
+    vendored_deps = [
+        "litellm>=1.83.0",
+        "fastmcp>=3.0.0",
+        "pydantic>=2.0",
+        "pyyaml",
+        "httpx",
+        "python-frontmatter",
+        "fastapi>=0.110",
+        'uvicorn[standard]>=0.27',
+    ]
+
+    if "project" in pyproject and "dependencies" in pyproject["project"]:
+        old_deps = list(pyproject["project"]["dependencies"])
+        new_deps = [d for d in old_deps if "fipsagents" not in d.lower()]
+        new_deps.extend(vendored_deps)
+        pyproject["project"]["dependencies"] = new_deps
+
+    # Fix optional memory dependency too
+    if "project" in pyproject:
+        opt_deps = pyproject["project"].get("optional-dependencies", {})
+        if "memory" in opt_deps:
+            old_memory = list(opt_deps["memory"])
+            new_memory = [d for d in old_memory if "fipsagents" not in d.lower()]
+            new_memory.append("memoryhub")
+            opt_deps["memory"] = new_memory
+
+    with open(pyproject_path, "w") as f:
+        f.write(tomlkit.dumps(pyproject))
+
+    console.print("[green]✓[/green] Updated pyproject.toml (vendored dependencies)")
