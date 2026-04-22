@@ -112,6 +112,7 @@ fips-agents add --help
 fips-agents create --help
 fips-agents generate --help
 fips-agents patch --help
+fips-agents vendor --help
 ```
 
 ---
@@ -183,6 +184,12 @@ Creates an AI agent project from the [agent-template](https://github.com/fips-ag
 
 **Options:** Same as `create mcp-server` (see shared options table above).
 
+**Additional option:**
+
+| Option | Description |
+|--------|-------------|
+| `--vendored` | Copy fipsagents source into the project instead of using PyPI dependency |
+
 **Examples:**
 
 ```bash
@@ -194,6 +201,9 @@ fips-agents create agent my-agent --github --org fips-agents
 
 # Non-interactive mode
 fips-agents create agent my-agent --yes --local
+
+# Create with vendored framework source
+fips-agents create agent my-agent --vendored --local
 ```
 
 #### `create gateway`
@@ -602,6 +612,45 @@ cd my-research-agent
 fips-agents add code-executor
 ```
 
+---
+
+### Vendor Commands
+
+The `vendor` command copies the fipsagents framework source into your agent project, replacing the PyPI dependency. This gives you full control over the framework code.
+
+#### `vendor`
+
+```bash
+fips-agents vendor [OPTIONS]
+```
+
+Copies fipsagents source into `src/fipsagents/` and rewrites `pyproject.toml` to use individual dependencies instead of the fipsagents package.
+
+**Options:**
+
+| Option | Description |
+|--------|-------------|
+| `--update` | Update an already-vendored project with the latest upstream source |
+| `--version TEXT` | Vendor a specific version tag (e.g., `fipsagents-v0.7.0`). Default: latest main |
+
+**Examples:**
+
+```bash
+# Vendor into current project
+fips-agents vendor
+
+# Vendor a specific version
+fips-agents vendor --version fipsagents-v0.7.0
+
+# Update vendored source from upstream
+fips-agents vendor --update
+```
+
+**When to use vendored vs. PyPI:**
+
+- **PyPI dependency** (default): Best for teams running multiple agents that share the same framework version. Centralized updates.
+- **Vendored source**: Best for agents that need custom BaseAgent modifications, environments with no PyPI access, or when you want to read and debug the framework source locally.
+
 ## Project Name Requirements
 
 Project names must follow these rules:
@@ -630,10 +679,9 @@ pytest
 
 ```bash
 cd my-research-agent
-python -m venv venv
-source venv/bin/activate
-pip install -e .[dev]
-pytest
+make install         # Create venv, install dependencies
+make run-local       # Start HTTP server on port 8080
+make test            # Run tests
 # See AGENTS.md for the /plan-agent slash command workflow
 ```
 
@@ -745,7 +793,8 @@ fips-agents-cli/
 │       │   ├── create.py   # create mcp-server, agent, gateway, ui
 │       │   ├── generate.py # generate tool/resource/prompt/middleware
 │       │   ├── model_car.py # create model-car
-│       │   └── patch.py    # patch command
+│       │   ├── patch.py    # patch command
+│       │   └── vendor.py   # vendor fipsagents source
 │       └── tools/          # Utility modules
 │           ├── filesystem.py
 │           ├── git.py
@@ -863,6 +912,15 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.8.0
+
+- Feature: New `--vendored` flag on `create agent` copies fipsagents source instead of PyPI dependency
+- Feature: New `fips-agents vendor` command for post-scaffold vendoring of existing projects
+- Feature: `fips-agents vendor --update` refreshes vendored source from upstream
+- Feature: `fips-agents vendor --version` pins to a specific fipsagents release tag
+- Fix: `customize_agent_project` now removes monorepo Makefile install line (matching workflow template behavior)
+- Fix: Added `redeploy.sh` to agent project customization file list
 
 ### Version 0.7.0
 
