@@ -661,7 +661,7 @@ class TestCreateAgent:
         mock_is_git_installed.return_value = True
         mock_gh_installed.return_value = False
 
-        def create_minimal_structure(url, target_path, subdir, branch=None):
+        def create_minimal_structure(url, target_path, subdir, branch=None, **kwargs):
             target_path.mkdir(parents=True, exist_ok=True)
             (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
 
@@ -698,7 +698,7 @@ class TestCreateAgent:
         mock_is_git_installed.return_value = True
         mock_gh_installed.return_value = False
 
-        def create_minimal_structure(url, target_path, subdir, branch=None):
+        def create_minimal_structure(url, target_path, subdir, branch=None, **kwargs):
             target_path.mkdir(parents=True, exist_ok=True)
             (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
 
@@ -763,7 +763,7 @@ class TestCreateAgentGitHub:
         mock_get_username.return_value = "testuser"
         mock_push.return_value = True
 
-        def create_minimal_structure(url, target_path, subdir, branch=None):
+        def create_minimal_structure(url, target_path, subdir, branch=None, **kwargs):
             target_path.mkdir(parents=True, exist_ok=True)
             (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
 
@@ -839,7 +839,7 @@ class TestCreateAgentGitHub:
         mock_get_username.return_value = "testuser"
         mock_push.return_value = True
 
-        def create_minimal_structure(url, target_path, subdir, branch=None):
+        def create_minimal_structure(url, target_path, subdir, branch=None, **kwargs):
             target_path.mkdir(parents=True, exist_ok=True)
             (target_path / "pyproject.toml").write_text('[project]\nname = "agent-template"')
 
