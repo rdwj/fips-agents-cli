@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **fips-agents-cli** is a Python-based CLI tool for scaffolding FIPS-compliant AI agent projects. It scaffolds MCP (Model Context Protocol) servers and AI agent projects from production-ready templates, customizes them for new projects, and prepares them for immediate development use.
 
-**Current Status:** `create mcp-server` and `create agent` commands implemented.
+**Current Status:** Scaffolding commands implemented: `create mcp-server`, `create agent`, `create gateway`, `create ui`, `create sandbox`, `create model-car`. Post-scaffolding commands: `generate` (tool, resource, prompt, middleware), `patch` (check, generators, core, docs, build, all), `add` (code-executor), `vendor`. Note: `create workflow` exists in code but is not yet working.
 
 ## Development Commands
 
@@ -324,6 +324,10 @@ Common causes:
 1. Forgot to activate venv
 2. Dependencies not installed: `pip install -e .[dev]`
 3. Git not configured globally: `git config --global user.email "test@example.com"`
+
+## Release Process Notes
+
+When creating a new release, always update the changelog in README.md *before* running the release script. The changelog lives in the README under the `## Changelog` heading. Each version should have its own section with the version number and date, listing new features, fixes, and breaking changes. Forgetting the changelog entry leads to patch releases (like v0.8.1) that exist solely to backfill documentation — avoid that by treating the changelog update as a required step in every release.
 
 ## Repository-Specific Notes
 
