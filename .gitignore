@@ -25,6 +25,7 @@ MANIFEST
 
 # Virtual environments
 venv/
+.venv/
 env/
 ENV/
 env.bak/
@@ -88,3 +89,6 @@ tokens.txt
 
 # Project specific
 setup_structure.sh
+
+# Session handoff notes (local-only — content lives in MEMORY.md)
+NEXT_SESSION.md
