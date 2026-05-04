@@ -903,6 +903,10 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.9.1
+
+- Chore: Realign `tests/` formatting with black 26.3.1 to match CI (v0.9.0's release pipeline failed because local black 24.x produced different output than CI's 26.x; no functional change)
+
 ### Version 0.9.0
 
 - Feature: `fips-agents patch` now supports agent and workflow projects in addition to MCP servers (#12)
