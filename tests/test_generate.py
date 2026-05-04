@@ -398,6 +398,123 @@ class TestGenerateMiddlewareCommand:
             os.chdir(original_cwd)
 
 
+@pytest.fixture
+def mock_mcp_project_with_real_middleware_template(tmp_path):
+    """Mock MCP project that uses the real middleware Jinja2 templates as fixtures.
+
+    Templates are committed under tests/fixtures/middleware_template/ so the
+    test runs offline and is not coupled to mcp-server-template's git state.
+    Refresh the fixtures when the upstream template changes meaningfully.
+    """
+    import shutil
+    from pathlib import Path
+
+    pyproject_content = """
+[project]
+name = "test-mcp-server"
+version = "0.1.0"
+dependencies = [
+    "fastmcp>=3.0.0",
+]
+"""
+    (tmp_path / "pyproject.toml").write_text(pyproject_content)
+
+    for component_dir in ["middleware"]:
+        (tmp_path / "src" / component_dir).mkdir(parents=True)
+        (tmp_path / "tests" / component_dir).mkdir(parents=True)
+
+    fixture_dir = Path(__file__).parent / "fixtures" / "middleware_template"
+    generators_dir = tmp_path / ".fips-agents-cli" / "generators" / "middleware"
+    generators_dir.mkdir(parents=True)
+    shutil.copy(fixture_dir / "component.py.j2", generators_dir / "component.py.j2")
+    shutil.copy(fixture_dir / "test.py.j2", generators_dir / "test.py.j2")
+
+    return tmp_path
+
+
+class TestGenerateMiddlewareRealTemplate:
+    """Integration tests that render the real v3.x middleware template.
+
+    These guard against regressions that would slip past the synthetic
+    `mock_mcp_project` fixture, which uses a stripped-down template that
+    doesn't exercise fastmcp imports, class structure, or the real
+    Jinja2 conditionals.
+    """
+
+    @pytest.mark.parametrize("hook_type", ["before_tool", "after_tool", "on_error"])
+    def test_real_template_renders_for_each_hook_type(
+        self, runner, mock_mcp_project_with_real_middleware_template, hook_type
+    ):
+        """Each --hook-type renders valid Python against the real v3.x template."""
+        import ast
+        import os
+
+        project = mock_mcp_project_with_real_middleware_template
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(project)
+            result = runner.invoke(
+                generate,
+                [
+                    "middleware",
+                    f"{hook_type}_mw",
+                    "--description",
+                    f"{hook_type} hook middleware",
+                    "--hook-type",
+                    hook_type,
+                ],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0, result.output
+
+            rendered = project / "src" / "middleware" / f"{hook_type}_mw.py"
+            assert rendered.exists()
+
+            source = rendered.read_text()
+            ast.parse(source)  # raises if invalid Python
+            assert "from fastmcp.server.middleware import" in source
+            assert "class " in source and "Middleware(Middleware):" in source
+            assert "async def on_call_tool" in source
+
+            test_file = project / "tests" / "middleware" / f"test_{hook_type}_mw.py"
+            assert test_file.exists()
+            ast.parse(test_file.read_text())
+        finally:
+            os.chdir(original_cwd)
+
+    def test_real_template_renders_without_hook_type(
+        self, runner, mock_mcp_project_with_real_middleware_template
+    ):
+        """Omitting --hook-type still produces a valid generic wrapper (backward compat)."""
+        import ast
+        import os
+
+        project = mock_mcp_project_with_real_middleware_template
+        original_cwd = os.getcwd()
+        try:
+            os.chdir(project)
+            result = runner.invoke(
+                generate,
+                [
+                    "middleware",
+                    "generic_mw",
+                    "--description",
+                    "generic middleware",
+                ],
+                catch_exceptions=False,
+            )
+            assert result.exit_code == 0, result.output
+
+            rendered = project / "src" / "middleware" / "generic_mw.py"
+            assert rendered.exists()
+            source = rendered.read_text()
+            ast.parse(source)
+            assert "class GenericMwMiddleware(Middleware):" in source
+            assert "async def on_call_tool" in source
+        finally:
+            os.chdir(original_cwd)
+
+
 class TestGenerateErrorCases:
     """Tests for error handling."""
 

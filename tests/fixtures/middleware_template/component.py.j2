@@ -1,0 +1,39 @@
+"""{{ description }}"""
+
+import mcp.types as mt
+from fastmcp.server.middleware import CallNext, Middleware, MiddlewareContext
+from fastmcp.tools.tool import ToolResult
+
+from src.core.logging import get_logger
+
+log = get_logger("middleware.{{ component_name }}")
+
+
+class {{ component_name | replace('_', ' ') | title | replace(' ', '') }}Middleware(Middleware):
+    """{{ description }}
+
+    To activate, add an instance to the middleware=[] list in create_server()
+    (see src/core/server.py).
+    """
+
+    async def on_call_tool(
+        self,
+        context: MiddlewareContext[mt.CallToolRequestParams],
+        call_next: CallNext[mt.CallToolRequestParams, ToolResult],
+    ) -> ToolResult:
+        """Wrap tool execution with {{ component_name }} logic."""
+        tool_name = context.message.name
+
+        log.debug(f"{{ component_name }} middleware: before {tool_name}")
+
+        # TODO: Add pre-execution logic here
+
+        try:
+            result = await call_next(context)
+        except Exception as e:
+            log.error(f"{{ component_name }} middleware: error in {tool_name}: {e}")
+            raise
+
+        # TODO: Add post-execution logic here
+
+        return result

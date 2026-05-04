@@ -91,17 +91,24 @@ This command will:
 
 ```bash
 # 1. Update version in both files manually or use the script:
-./scripts/release.sh <version> "<commit-message>"
+./scripts/release.sh <version> [<summary>]
 
-# Example:
+# Examples:
+./scripts/release.sh 0.1.2
 ./scripts/release.sh 0.1.2 "Add new generator features"
 
 # The script handles:
 # - Updating version.py and pyproject.toml
+# - Constructing the release commit message from the project convention
 # - Committing changes (including README.md changelog)
 # - Creating and pushing tag
 # - Triggering GitHub Actions
 ```
+
+**Release commit message convention**: `chore: Release fips-agents-cli vX.Y.Z`,
+optionally followed by ` — <summary>`. The script always constructs the message
+from the version argument; callers only supply the summary, never the full
+message. This keeps `git log --grep "Release fips-agents-cli"` reliable.
 
 **Note**: Always update the changelog in README.md before running the script.
 
