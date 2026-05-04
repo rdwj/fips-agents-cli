@@ -524,7 +524,9 @@ When using `--params` with `generate tool` or `generate prompt`, provide a JSON 
 
 ### Patch Commands
 
-The `patch` command group updates files in existing MCP server projects from the upstream template repository without overwriting your custom code. It shows interactive diffs for files that may contain customizations.
+The `patch` command group updates files in existing projects from the upstream template repository without overwriting your custom code. It shows interactive diffs for files that may contain customizations.
+
+Supported project types: **MCP server**, **agent**, **workflow**. The available category subcommands depend on the project type — `patch` reads `template.type` from `.template-info` and surfaces a clear error if you run a category that doesn't apply (e.g. `patch generators` inside an agent project).
 
 Run these commands from within your project directory.
 
@@ -534,39 +536,7 @@ Run these commands from within your project directory.
 fips-agents patch check
 ```
 
-Check for available template updates. Shows what files have changed in the template since your project was created, organized by category.
-
-#### `patch generators`
-
-```bash
-fips-agents patch generators [--dry-run]
-```
-
-Update code generator templates (Jinja2 templates in `.fips-agents-cli/generators/`).
-
-#### `patch core`
-
-```bash
-fips-agents patch core [--dry-run]
-```
-
-Update core infrastructure files (loaders, server bootstrap).
-
-#### `patch docs`
-
-```bash
-fips-agents patch docs [--dry-run]
-```
-
-Update documentation files and examples.
-
-#### `patch build`
-
-```bash
-fips-agents patch build [--dry-run]
-```
-
-Update build and deployment files (Makefile, Containerfile).
+Check for available template updates. Shows what files have changed in the template since your project was created, organized by category. Works for any supported project type.
 
 #### `patch all`
 
@@ -574,7 +544,27 @@ Update build and deployment files (Makefile, Containerfile).
 fips-agents patch all [--dry-run] [--skip-confirmation]
 ```
 
-Update all patchable file categories at once. Prompts for confirmation before starting unless `--skip-confirmation` is passed.
+Update every category that applies to the current project type. Prompts for confirmation before starting unless `--skip-confirmation` is passed.
+
+#### MCP server categories
+
+| Subcommand           | Patches                                                                  |
+|----------------------|--------------------------------------------------------------------------|
+| `patch generators`   | Jinja2 templates in `.fips-agents-cli/generators/`                       |
+| `patch core`         | Core infrastructure (loaders, server bootstrap)                          |
+| `patch docs`         | Documentation files and examples                                         |
+| `patch build`        | Build and deployment files (Makefile, Containerfile)                     |
+
+#### Agent / workflow categories
+
+| Subcommand     | Patches                                                                       |
+|----------------|-------------------------------------------------------------------------------|
+| `patch chart`  | Helm chart templates (`chart/templates/**`, `chart/Chart.yaml`)                |
+| `patch docs`   | `CLAUDE.md`, `AGENTS.md`, `docs/**`                                            |
+| `patch build`  | `Makefile`, `Containerfile`, `deploy.sh`, `redeploy.sh`                        |
+| `patch claude` | Claude Code slash commands shipped with the template (`.claude/commands/**`)   |
+
+User-customized files are never patched: for MCP this means `src/tools/`, `src/resources/`, `src/prompts/`, `src/middleware/`, `pyproject.toml`, etc. For agent/workflow it means `src/agent.py`, `agent.yaml`, `chart/values.yaml`, `src/fipsagents/**` (managed by `fips-agents vendor`), and `pyproject.toml`.
 
 All patch subcommands (except `check`) accept `--dry-run` to preview changes without modifying files.
 
@@ -912,6 +902,18 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.9.0
+
+- Feature: `fips-agents patch` now supports agent and workflow projects in addition to MCP servers (#12)
+- Feature: New `patch chart` and `patch claude` subcommands for agent/workflow projects (#15)
+- Feature: `.template-info` now records `template.type` and (for monorepo templates) `template.subdir` so post-scaffolding commands can route by project type (#13)
+- Feature: New `find_fips_project_root()` walks up to `.template-info`, replacing the MCP-only fastmcp-dependency probe in patch commands (#14)
+- Improvement: `_clone_template_for_patch()` resolves the monorepo subdir during patching, so glob/compare runs against `templates/agent-loop/` instead of the monorepo root (#16)
+- Improvement: Running an MCP-only subcommand inside an agent project (or vice versa) now exits with a clear "available categories" error
+- Improvement: `patch all` enumerates the project's actual category set instead of assuming MCP layout
+- Backwards compat: Projects scaffolded before `template.type` existed default to `mcp-server`; no migration required
+- Tests: 20 new tests in `tests/test_patch.py` covering the type-aware patch flow end-to-end against a fake-scaffolded agent project
 
 ### Version 0.8.2
 
