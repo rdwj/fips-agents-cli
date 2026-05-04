@@ -10,10 +10,10 @@ from rich.table import Table
 from fips_agents_cli.tools.patching import (
     check_for_updates,
     get_available_categories,
-    get_template_info,
+    get_project_type,
     patch_category,
 )
-from fips_agents_cli.tools.validation import find_project_root
+from fips_agents_cli.tools.validation import find_fips_project_root
 
 console = Console()
 
@@ -33,23 +33,14 @@ def check():
     """
     console.print("\n[bold cyan]Checking for Template Updates[/bold cyan]\n")
 
-    # Find project root
-    project_root = find_project_root()
-    if not project_root:
+    found = find_fips_project_root()
+    if not found:
         console.print(
             "[red]✗[/red] Not in a project directory\n"
             "[yellow]Hint:[/yellow] Run this command from within a project created by fips-agents"
         )
         sys.exit(1)
-
-    # Get template info
-    template_info = get_template_info(project_root)
-    if not template_info:
-        console.print(
-            "[red]✗[/red] No template metadata found\n"
-            "[yellow]Hint:[/yellow] This project may not have been created by fips-agents-cli"
-        )
-        sys.exit(1)
+    project_root, template_info = found
 
     console.print("[green]✓[/green] Project created from template")
     console.print(f"  Template: {template_info['template']['url']}")
@@ -134,6 +125,37 @@ def build(dry_run: bool):
     _patch_category("build", dry_run)
 
 
+@patch.command("chart")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be updated without making changes",
+)
+def chart(dry_run: bool):
+    """
+    Update Helm chart templates (agent / workflow projects only).
+
+    Patches files under chart/templates/ and chart/Chart.yaml.
+    chart/values.yaml is never patched (user-customized).
+    """
+    _patch_category("chart", dry_run)
+
+
+@patch.command("claude")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be updated without making changes",
+)
+def claude(dry_run: bool):
+    """
+    Update Claude Code slash commands (agent / workflow projects only).
+
+    Patches files under .claude/commands/ that ship with the template.
+    """
+    _patch_category("claude", dry_run)
+
+
 @patch.command("all")
 @click.option(
     "--dry-run",
@@ -153,13 +175,23 @@ def all_categories(dry_run: bool, skip_confirmation: bool):
     """
     console.print("\n[bold cyan]Patching All Categories[/bold cyan]\n")
 
+    found = find_fips_project_root()
+    if not found:
+        console.print(
+            "[red]✗[/red] Not in a project directory\n"
+            "[yellow]Hint:[/yellow] Run this command from within a project created by fips-agents"
+        )
+        sys.exit(1)
+    _, template_info = found
+    project_type = get_project_type(template_info)
+
     if not skip_confirmation:
         confirm = click.confirm("This will update multiple files. Continue?", default=True)
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             sys.exit(0)
 
-    categories = get_available_categories()
+    categories = get_available_categories(project_type)
     for category in categories:
         console.print(f"\n[bold]Processing category: {category}[/bold]")
         _patch_category(category, dry_run, skip_confirmation=skip_confirmation)
@@ -174,23 +206,14 @@ def _patch_category(category: str, dry_run: bool, skip_confirmation: bool = Fals
         dry_run: If True, only show what would be changed
         skip_confirmation: If True, don't ask for confirmation
     """
-    # Find project root
-    project_root = find_project_root()
-    if not project_root:
+    found = find_fips_project_root()
+    if not found:
         console.print(
             "[red]✗[/red] Not in a project directory\n"
             "[yellow]Hint:[/yellow] Run this command from within a project created by fips-agents"
         )
         sys.exit(1)
-
-    # Get template info
-    template_info = get_template_info(project_root)
-    if not template_info:
-        console.print(
-            "[red]✗[/red] No template metadata found\n"
-            "[yellow]Hint:[/yellow] This project may not have been created by fips-agents-cli"
-        )
-        sys.exit(1)
+    project_root, template_info = found
 
     # Perform patch
     success, message = patch_category(

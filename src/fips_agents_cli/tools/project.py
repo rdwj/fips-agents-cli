@@ -520,6 +520,8 @@ def write_template_info(
     project_name: str,
     template_url: str,
     template_commit: str,
+    template_type: str,
+    template_subdir: str | None = None,
     github_repo: str | None = None,
     github_url: str | None = None,
 ) -> None:
@@ -531,17 +533,27 @@ def write_template_info(
         project_name: Name of the generated project
         template_url: URL of the template repository
         template_commit: Git commit hash of the template
+        template_type: Project type ('mcp-server', 'agent', 'workflow',
+            'gateway', 'ui', 'sandbox'). Read by `patch` to select the
+            right file categories and exclusions.
+        template_subdir: Subdirectory within the repo for monorepo templates
+            (e.g. 'templates/agent-loop'). Omit for standalone repos.
         github_repo: GitHub repository in "owner/name" format (optional)
         github_url: Full URL to the GitHub repository (optional)
     """
     try:
+        template_block = {
+            "url": template_url,
+            "type": template_type,
+            "commit": template_commit[:12],  # Short hash
+            "full_commit": template_commit,
+        }
+        if template_subdir:
+            template_block["subdir"] = template_subdir
+
         template_info = {
             "generator": {"tool": "fips-agents-cli", "version": __version__},
-            "template": {
-                "url": template_url,
-                "commit": template_commit[:12],  # Short hash
-                "full_commit": template_commit,
-            },
+            "template": template_block,
             "project": {
                 "name": project_name,
                 "created_at": datetime.now(timezone.utc).isoformat(),

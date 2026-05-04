@@ -15,8 +15,8 @@ from fips_agents_cli.tools.git import clone_template
 
 console = Console()
 
-# File categories for patching
-FILE_CATEGORIES = {
+# File categories for MCP server projects
+MCP_FILE_CATEGORIES = {
     "generators": {
         "description": "Code generator templates (Jinja2)",
         "patterns": [
@@ -58,8 +58,8 @@ FILE_CATEGORIES = {
     },
 }
 
-# Files to NEVER patch (user code)
-NEVER_PATCH = [
+# Files to NEVER patch in MCP server projects (user code)
+MCP_NEVER_PATCH = [
     "src/tools/*.py",
     "src/resources/*.py",
     "src/prompts/*.py",
@@ -72,6 +72,82 @@ NEVER_PATCH = [
     "src/core/auth.py",  # Custom auth
     "src/core/logging.py",  # Custom logging
 ]
+
+# File categories for agent and workflow projects (same template repo,
+# same directory layout — both ship with chart/, docs/, build files,
+# and .claude/commands/, none of which match the MCP layout)
+AGENT_FILE_CATEGORIES = {
+    "chart": {
+        "description": "Helm chart templates",
+        "patterns": [
+            "chart/templates/**/*",
+            "chart/Chart.yaml",
+        ],
+        "ask_before_patch": True,  # User may have customized
+    },
+    "docs": {
+        "description": "Documentation files",
+        "patterns": [
+            "CLAUDE.md",
+            "AGENTS.md",
+            "docs/**/*",
+        ],
+        "ask_before_patch": False,  # Usually safe to update
+    },
+    "build": {
+        "description": "Build and deployment files",
+        "patterns": [
+            "Makefile",
+            "Containerfile",
+            "deploy.sh",
+            "redeploy.sh",
+        ],
+        "ask_before_patch": True,  # May be customized
+    },
+    "claude": {
+        "description": "Claude Code slash commands shipped with the template",
+        "patterns": [
+            ".claude/commands/**/*",
+        ],
+        "ask_before_patch": False,  # Safe to overwrite
+    },
+}
+
+# Files to NEVER patch in agent / workflow projects (user code)
+AGENT_NEVER_PATCH = [
+    "src/agent.py",  # User's agent implementation
+    "agent.yaml",  # User's agent config
+    "chart/values.yaml",  # User's deploy values
+    "src/fipsagents/**",  # Vendored — managed by `fips-agents vendor --update`
+    "tests/**/*.py",
+    ".env*",
+    "README.md",
+    "pyproject.toml",  # User may have added dependencies
+]
+
+
+def get_categories_for_type(project_type: str) -> tuple[dict, list[str]]:
+    """
+    Return the (categories, never_patch) tuple for a given project type.
+
+    Args:
+        project_type: One of 'mcp-server', 'agent', 'workflow'. Other types
+            (gateway, ui, sandbox) are not patchable yet and raise ValueError.
+
+    Returns:
+        tuple: (file_categories_dict, never_patch_list)
+
+    Raises:
+        ValueError: If the project type does not support patching.
+    """
+    if project_type == "mcp-server":
+        return MCP_FILE_CATEGORIES, MCP_NEVER_PATCH
+    if project_type in ("agent", "workflow"):
+        return AGENT_FILE_CATEGORIES, AGENT_NEVER_PATCH
+    raise ValueError(
+        f"Patching is not supported for project type '{project_type}'. "
+        "Supported types: mcp-server, agent, workflow."
+    )
 
 
 def get_template_info(project_path: Path) -> dict[str, Any] | None:
@@ -96,9 +172,58 @@ def get_template_info(project_path: Path) -> dict[str, Any] | None:
         return None
 
 
-def get_available_categories() -> list[str]:
-    """Get list of available patch categories."""
-    return list(FILE_CATEGORIES.keys())
+def get_project_type(template_info: dict[str, Any]) -> str:
+    """
+    Read the project type from template-info, defaulting to 'mcp-server'.
+
+    Projects scaffolded before .template-info gained the `template.type`
+    field (v0.8.x and earlier) are all MCP servers — that was the only
+    patchable type at the time.
+    """
+    return template_info.get("template", {}).get("type", "mcp-server")
+
+
+def get_available_categories(project_type: str = "mcp-server") -> list[str]:
+    """Get list of available patch categories for a given project type."""
+    categories, _ = get_categories_for_type(project_type)
+    return list(categories.keys())
+
+
+def _clone_template_for_patch(template_info: dict[str, Any], temp_path: Path) -> Path:
+    """
+    Clone the template repo and return the comparison root.
+
+    For standalone repos (mcp-server, gateway, ui, sandbox), the comparison
+    root is the clone root itself. For monorepo subdirs (agent, workflow),
+    it's `temp_path / subdir`.
+
+    Args:
+        template_info: Template metadata read from .template-info
+        temp_path: Pre-created temp directory the caller manages
+
+    Returns:
+        Path: The directory whose layout mirrors the project — use this
+        as the root for glob/compare operations, not `temp_path`.
+
+    Raises:
+        FileNotFoundError: If `template.subdir` is set but does not exist
+            in the cloned repo.
+    """
+    template_block = template_info["template"]
+    template_url = template_block["url"]
+    subdir = template_block.get("subdir")
+
+    clone_template(template_url, temp_path)
+
+    if not subdir:
+        return temp_path
+
+    template_root = temp_path / subdir
+    if not template_root.is_dir():
+        raise FileNotFoundError(
+            f"Template subdir '{subdir}' not found in cloned repo {template_url}"
+        )
+    return template_root
 
 
 def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict[str, Any]:
@@ -113,29 +238,27 @@ def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict
         dict: Dictionary of categories with changed files
     """
     template_url = template_info["template"]["url"]
-    # original_commit = template_info["template"]["full_commit"]  # For future use
+    project_type = get_project_type(template_info)
+    file_categories, _ = get_categories_for_type(project_type)
 
     console.print(f"[cyan]Fetching latest template from {template_url}...[/cyan]")
 
     # Clone latest template to temp directory
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
-        clone_template(template_url, temp_path)
-
-        # Get latest commit
-        # (For now, we'll just compare files - can enhance to get actual latest commit)
+        template_root = _clone_template_for_patch(template_info, temp_path)
 
         updates = {}
 
-        for category, config in FILE_CATEGORIES.items():
+        for category, config in file_categories.items():
             changed_files = []
 
             for pattern in config["patterns"]:
                 # Find matching files in template
-                for template_file in temp_path.glob(pattern):
+                for template_file in template_root.glob(pattern):
                     if template_file.is_file():
                         # Get relative path
-                        rel_path = template_file.relative_to(temp_path)
+                        rel_path = template_file.relative_to(template_root)
                         project_file = project_path / rel_path
 
                         # Check if file exists and is different
@@ -174,35 +297,42 @@ def patch_category(
     Returns:
         tuple: (success, message)
     """
-    if category not in FILE_CATEGORIES:
-        return False, f"Unknown category: {category}"
+    project_type = get_project_type(template_info)
+    file_categories, never_patch = get_categories_for_type(project_type)
 
-    config = FILE_CATEGORIES[category]
+    if category not in file_categories:
+        available = ", ".join(file_categories.keys()) or "(none)"
+        return (
+            False,
+            f"Category '{category}' is not valid for {project_type} projects. "
+            f"Available: {available}",
+        )
+
+    config = file_categories[category]
     template_url = template_info["template"]["url"]
 
     console.print(f"\n[bold cyan]Patching Category: {category}[/bold cyan]")
     console.print(f"[dim]{config['description']}[/dim]\n")
 
-    # Clone template
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         console.print(f"[cyan]Fetching template from {template_url}...[/cyan]")
-        clone_template(template_url, temp_path)
+        template_root = _clone_template_for_patch(template_info, temp_path)
         console.print("[green]✓[/green] Template fetched\n")
 
         files_patched = 0
         files_skipped = 0
 
         for pattern in config["patterns"]:
-            for template_file in temp_path.glob(pattern):
+            for template_file in template_root.glob(pattern):
                 if not template_file.is_file():
                     continue
 
-                rel_path = template_file.relative_to(temp_path)
+                rel_path = template_file.relative_to(template_root)
                 project_file = project_path / rel_path
 
                 # Check if file should be patched
-                if _should_never_patch(rel_path):
+                if _should_never_patch(rel_path, never_patch):
                     console.print(f"[dim]Skipping (user code): {rel_path}[/dim]")
                     files_skipped += 1
                     continue
@@ -249,10 +379,10 @@ def _files_identical(file1: Path, file2: Path) -> bool:
         return False
 
 
-def _should_never_patch(file_path: Path) -> bool:
-    """Check if a file should never be patched."""
+def _should_never_patch(file_path: Path, never_patch: list[str]) -> bool:
+    """Check if a file should never be patched, given the rule list."""
     file_str = str(file_path)
-    for pattern in NEVER_PATCH:
+    for pattern in never_patch:
         if Path(file_str).match(pattern):
             return True
     return False

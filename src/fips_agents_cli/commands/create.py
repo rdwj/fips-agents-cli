@@ -263,6 +263,7 @@ def mcp_server(
                         project_name,
                         MCP_SERVER_TEMPLATE_URL,
                         template_commit,
+                        template_type="mcp-server",
                         github_repo=github_repo,
                         github_url=github_url,
                     )
@@ -545,6 +546,8 @@ def agent(
                         project_name,
                         AGENT_TEMPLATE_URL,
                         template_commit,
+                        template_type="agent",
+                        template_subdir=AGENT_TEMPLATE_SUBDIR,
                         github_repo=github_repo,
                         github_url=github_url,
                     )
@@ -804,6 +807,8 @@ def workflow(
                         project_name,
                         AGENT_TEMPLATE_URL,
                         template_commit,
+                        template_type="workflow",
+                        template_subdir=WORKFLOW_TEMPLATE_SUBDIR,
                         github_repo=github_repo,
                         github_url=github_url,
                     )
@@ -1062,6 +1067,7 @@ def gateway(
                         project_name,
                         GATEWAY_TEMPLATE_URL,
                         template_commit,
+                        template_type="gateway",
                         github_repo=github_repo,
                         github_url=github_url,
                     )
@@ -1320,6 +1326,7 @@ def ui(
                         project_name,
                         UI_TEMPLATE_URL,
                         template_commit,
+                        template_type="ui",
                         github_repo=github_repo,
                         github_url=github_url,
                     )
@@ -1577,6 +1584,7 @@ def sandbox(
                         project_name,
                         SANDBOX_TEMPLATE_URL,
                         template_commit,
+                        template_type="sandbox",
                         github_repo=github_repo,
                         github_url=github_url,
                     )
