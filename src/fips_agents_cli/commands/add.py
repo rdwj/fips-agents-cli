@@ -6,6 +6,7 @@ from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
+from ruamel.yaml import YAML
 
 from fips_agents_cli.tools.modality import (
     ModalityError,
@@ -164,6 +165,216 @@ FILES_SPEC = ModalitySpec(
 )
 
 
+# ---------------------------------------------------------------------------
+# vision — multimodal (image input) example client
+# ---------------------------------------------------------------------------
+
+# A self-contained client snippet showing the three image_url variants the
+# server accepts. Lives at examples/vision_client.py — out of the agent
+# import path on purpose, since content blocks are constructed by callers,
+# not by the agent itself.
+VISION_CLIENT_SOURCE = '''\
+"""Vision input examples — three ways to send an image to a multimodal agent.
+
+The agent runtime accepts any OpenAI-shaped ``image_url`` content block on
+``POST /v1/chat/completions``. The block carries a URL in one of three
+forms; the agent (via ``OpenAIChatServer._resolve_image_file_ids``)
+rewrites ``file_id:<id>`` references to inline ``data:`` URIs before
+forwarding to the model.
+
+Prerequisites:
+- Files capability is enabled (``fips-agents add files`` already run).
+- The configured ``model.endpoint`` is a vision-capable model (e.g.
+  Granite Vision 3.2-2B, LLaVA, Phi-4-Multimodal). Set
+  ``MODEL_ENDPOINT`` and ``MODEL_NAME`` accordingly.
+
+Run against a locally-running agent:
+
+    python examples/vision_client.py
+"""
+
+from __future__ import annotations
+
+import base64
+import os
+import sys
+from pathlib import Path
+
+import httpx
+
+AGENT_URL = os.environ.get("AGENT_URL", "http://localhost:8080")
+
+
+def variant_data_uri(image_path: Path) -> dict:
+    """Inline the image as a base64 ``data:`` URI.
+
+    Suited for one-shot requests where the image lives on the client
+    and you do not need to reference it again.
+    """
+    mime = "image/png" if image_path.suffix.lower() == ".png" else "image/jpeg"
+    encoded = base64.b64encode(image_path.read_bytes()).decode("ascii")
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"data:{mime};base64,{encoded}"},
+    }
+
+
+def variant_remote_url(url: str) -> dict:
+    """Reference a publicly-fetchable HTTPS URL.
+
+    The model serves the URL itself; no upload is required. Best when
+    the image is already on a CDN or public bucket.
+    """
+    return {"type": "image_url", "image_url": {"url": url}}
+
+
+def variant_file_id(image_path: Path) -> dict:
+    """Upload the image once via POST /v1/files, then reference by id.
+
+    The agent fetches bytes from the configured BytesStore, sniffs the
+    MIME type, and rewrites the URL to a ``data:`` URI server-side
+    before forwarding to the model. Best when the same image is used
+    across multiple turns or sessions.
+    """
+    with httpx.Client() as client:
+        upload = client.post(
+            f"{AGENT_URL}/v1/files",
+            files={"file": (image_path.name, image_path.read_bytes(), "image/png")},
+            timeout=30.0,
+        )
+        upload.raise_for_status()
+        file_id = upload.json()["file_id"]
+    return {
+        "type": "image_url",
+        "image_url": {"url": f"file_id:{file_id}"},
+    }
+
+
+def chat_with_image(prompt: str, image_block: dict) -> str:
+    with httpx.Client() as client:
+        resp = client.post(
+            f"{AGENT_URL}/v1/chat/completions",
+            json={
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            image_block,
+                        ],
+                    }
+                ],
+                "max_tokens": 128,
+                "temperature": 0,
+            },
+            timeout=60.0,
+        )
+        resp.raise_for_status()
+        return resp.json()["choices"][0]["message"]["content"]
+
+
+if __name__ == "__main__":
+    image = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("./test.png")
+    if not image.exists():
+        print(f"Image not found: {image}", file=sys.stderr)
+        print("Usage: python examples/vision_client.py [path/to/image.png]", file=sys.stderr)
+        sys.exit(1)
+
+    print("=== Variant 1: inline data: URI ===")
+    print(chat_with_image("Describe this image briefly.", variant_data_uri(image)))
+
+    print("\\n=== Variant 2: remote URL ===")
+    # Replace with any public image URL.
+    print(
+        chat_with_image(
+            "Describe this image briefly.",
+            variant_remote_url("https://upload.wikimedia.org/wikipedia/commons/4/47/PNG_transparency_demonstration_1.png"),
+        )
+    )
+
+    print("\\n=== Variant 3: file_id (server-resolved) ===")
+    print(chat_with_image("Describe this image briefly.", variant_file_id(image)))
+'''
+
+
+VISION_NEXT_STEPS = (
+    "1. Set the agent's model endpoint to a vision-capable model.",
+    "   Granite Vision 3.2-2B is the canonical example:",
+    "     [dim]export MODEL_ENDPOINT=https://granite-vision-3-2-2b-...:443/v1[/dim]",
+    "     [dim]export MODEL_NAME=ibm-granite/granite-vision-3.2-2b[/dim]",
+    "",
+    "2. Run the agent locally:",
+    "   [dim]make run-local[/dim]",
+    "",
+    "3. Send an image-bearing chat completion. Three URL forms work:",
+    "",
+    r"   [bold]data:[/bold] inline base64 (\"data:image/png;base64,...\")",
+    "   [bold]https://[/bold] remote URL the model fetches",
+    "   [bold]file_id:[/bold] internal scheme — upload via POST /v1/files first,",
+    "     then reference the returned id; the agent rewrites the URL to",
+    "     a data: URI server-side before forwarding to the model.",
+    "",
+    "4. See examples/vision_client.py for runnable snippets of all three.",
+    "",
+    "5. Notes:",
+    "   - Image input requires fipsagents>=0.20.0 (content-block support).",
+    "   - Tool calling is not enabled on most vision endpoints — your",
+    "     agent's step() may need to call_model(include_tools=False).",
+    "   - Trace spans fingerprint image bytes (SHA-256 + size); raw",
+    "     payloads are never logged.",
+)
+
+
+def _vision_precondition(project_root: Path) -> tuple[bool, str]:
+    """Vision input only makes sense when files is enabled.
+
+    The ``file_id:<id>`` URL scheme resolves bytes via the configured
+    ``BytesStore``, which is only wired up when ``server.files.enabled``
+    is true. The other two variants (``data:`` URIs and remote
+    ``https://`` URLs) work without files, but the agent's value-add is
+    the file_id resolution path — fail fast and tell the user to run
+    ``fips-agents add files`` first.
+    """
+    yaml_path = project_root / "agent.yaml"
+    if not yaml_path.exists():
+        return False, "agent.yaml not found in this project"
+
+    yaml = YAML()
+    try:
+        with open(yaml_path) as f:
+            data = yaml.load(f)
+    except Exception as e:
+        return False, f"Failed to parse agent.yaml: {e}"
+
+    server = data.get("server") if hasattr(data, "get") else None
+    files = server.get("files") if server is not None and hasattr(server, "get") else None
+    enabled = files.get("enabled") if files is not None and hasattr(files, "get") else None
+
+    if enabled is True:
+        return True, ""
+
+    return False, (
+        "Vision input requires file uploads to be enabled — "
+        "the file_id:<id> URL scheme resolves bytes via the agent's "
+        "BytesStore. Run `fips-agents add files` first, then re-run "
+        "`fips-agents add vision`."
+    )
+
+
+VISION_SPEC = ModalitySpec(
+    name="vision",
+    description="Multimodal image input via OpenAI content blocks",
+    source_files=(
+        SourceFile(
+            relative_path="examples/vision_client.py",
+            content=VISION_CLIENT_SOURCE,
+        ),
+    ),
+    precondition=_vision_precondition,
+    next_steps=VISION_NEXT_STEPS,
+)
+
+
 def _print_modality_result(spec: ModalitySpec, result: ModalityResult) -> None:
     """Render the per-action lines + the success panel for an applied spec."""
     for action in result.actions:
@@ -263,3 +474,30 @@ def files_cmd():
         fips-agents add files
     """
     _run_modality(FILES_SPEC)
+
+
+@add.command("vision")
+def vision_cmd():
+    """Wire multimodal (image input) example client into the project.
+
+    Drops examples/vision_client.py showing the three image_url URL
+    forms the agent runtime accepts (inline data:, remote https://,
+    and the internal file_id:<id> scheme). Files capability must be
+    enabled first — run `fips-agents add files` and re-run.
+
+    Image input runs through the agent's existing model.endpoint —
+    no separate vision endpoint split. Set MODEL_ENDPOINT and
+    MODEL_NAME to a vision-capable model (e.g. Granite Vision 3.2-2B,
+    LLaVA, Phi-4-Multimodal) before running the agent.
+
+    Requires fipsagents>=0.20.0 in the project's dependencies.
+
+    Example:
+
+        cd my-research-agent
+
+        fips-agents add files     # prerequisite
+
+        fips-agents add vision
+    """
+    _run_modality(VISION_SPEC)

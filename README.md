@@ -625,6 +625,37 @@ cd my-research-agent
 fips-agents add code-executor
 ```
 
+#### `add vision`
+
+```bash
+fips-agents add vision
+```
+
+Wires multimodal (image input) example client code into your project. Drops `examples/vision_client.py` showing the three `image_url` URL forms the agent runtime accepts: inline `data:` URIs, remote `https://` URLs, and the internal `file_id:<id>` scheme that the agent rewrites to a `data:` URI server-side.
+
+Image input flows through the agent's existing `model.endpoint` — there is no separate vision endpoint split. Set `MODEL_ENDPOINT` and `MODEL_NAME` to a vision-capable model (e.g. Granite Vision 3.2-2B, LLaVA, Phi-4-Multimodal) before running the agent.
+
+**Prerequisite:** `fips-agents add files` must have been run first. The `file_id:<id>` URL scheme resolves bytes via the agent's `BytesStore`, which only exists when files is enabled. The command refuses to apply if `server.files.enabled` is not `true` in `agent.yaml`.
+
+**Requires:** `fipsagents>=0.20.0` in the project's dependencies (content-block support landed in 0.20.0).
+
+**What it does:**
+
+1. Verifies `server.files.enabled: true` in `agent.yaml` (precondition)
+2. Writes `examples/vision_client.py` with runnable snippets for all three URL forms
+
+**Example:**
+
+```bash
+cd my-research-agent
+fips-agents add files     # prerequisite
+fips-agents add vision
+export MODEL_ENDPOINT=https://granite-vision-3-2-2b-...:443/v1
+export MODEL_NAME=ibm-granite/granite-vision-3.2-2b
+make run-local
+python examples/vision_client.py path/to/image.png
+```
+
 ---
 
 ### Vendor Commands
