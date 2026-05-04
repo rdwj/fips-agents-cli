@@ -2,9 +2,20 @@
 #
 # release.sh - Automated release script for fips-agents-cli
 #
-# Usage: ./scripts/release.sh <version> <commit-message>
+# Usage: ./scripts/release.sh <version> [<summary>]
 #
-# Example: ./scripts/release.sh 0.1.2 "Add new feature for X"
+# The release commit message is always constructed from the version using
+# the project convention:
+#
+#     chore: Release fips-agents-cli vX.Y.Z
+#
+# If a summary is provided, it is appended after an em-dash:
+#
+#     chore: Release fips-agents-cli vX.Y.Z — <summary>
+#
+# Examples:
+#   ./scripts/release.sh 0.1.2
+#   ./scripts/release.sh 0.1.2 "Add new generator features"
 #
 
 set -e  # Exit on error
@@ -29,20 +40,30 @@ print_info() {
 }
 
 # Check arguments
-if [ $# -ne 2 ]; then
-    print_error "Usage: $0 <version> <commit-message>"
-    echo "Example: $0 0.1.2 \"Add new feature for X\""
+if [ $# -lt 1 ] || [ $# -gt 2 ]; then
+    print_error "Usage: $0 <version> [<summary>]"
+    echo "Examples:"
+    echo "  $0 0.1.2"
+    echo "  $0 0.1.2 \"Add new generator features\""
     exit 1
 fi
 
 VERSION=$1
-COMMIT_MSG=$2
+SUMMARY=${2:-}
 
 # Validate version format (x.y.z)
 if ! [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     print_error "Invalid version format: $VERSION"
     echo "Version must be in format: x.y.z (e.g., 0.1.2)"
     exit 1
+fi
+
+# Construct the conventional release commit message.
+# Convention: "chore: Release fips-agents-cli vX.Y.Z" with optional " — <summary>".
+if [ -n "$SUMMARY" ]; then
+    COMMIT_MSG="chore: Release fips-agents-cli v${VERSION} — ${SUMMARY}"
+else
+    COMMIT_MSG="chore: Release fips-agents-cli v${VERSION}"
 fi
 
 print_info "Preparing release v$VERSION"

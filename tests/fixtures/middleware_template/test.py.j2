@@ -1,0 +1,40 @@
+"""Tests for {{ component_name }} middleware."""
+
+import pytest
+from unittest.mock import AsyncMock, MagicMock
+import mcp.types as mt
+
+from src.middleware.{{ module_path }} import {{ component_name | replace('_', ' ') | title | replace(' ', '') }}Middleware
+
+
+@pytest.mark.asyncio
+async def test_{{ component_name }}_success():
+    """Test middleware handles successful execution."""
+    middleware = {{ component_name | replace('_', ' ') | title | replace(' ', '') }}Middleware()
+
+    # Create mock context
+    context = MagicMock(spec=mt.CallToolRequestParams)
+    context.message.name = "test_tool"
+
+    # Create mock call_next
+    call_next = AsyncMock(return_value="success_result")
+
+    # Execute middleware
+    result = await middleware.on_call_tool(context, call_next)
+
+    assert result == "success_result"
+    call_next.assert_called_once_with(context)
+
+
+@pytest.mark.asyncio
+async def test_{{ component_name }}_error():
+    """Test middleware handles errors."""
+    middleware = {{ component_name | replace('_', ' ') | title | replace(' ', '') }}Middleware()
+
+    context = MagicMock(spec=mt.CallToolRequestParams)
+    context.message.name = "failing_tool"
+
+    call_next = AsyncMock(side_effect=ValueError("Test error"))
+
+    with pytest.raises(ValueError, match="Test error"):
+        await middleware.on_call_tool(context, call_next)
