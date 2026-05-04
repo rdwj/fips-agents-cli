@@ -141,7 +141,7 @@ Two cloning strategies exist:
 1. Clone monorepo, extract `templates/agent-loop/` subdirectory
 2. Update `pyproject.toml` name field via tomlkit
 3. String-replace `agent-template` → new name in Chart.yaml, values.yaml, AGENTS.md, Containerfile, Makefile
-4. Source directories are NOT renamed — `base_agent` is a framework component
+4. Source directories are NOT renamed — the agent-loop template ships with `src/agent.py` directly, not a project-named module
 5. Initialize fresh git repository with initial commit
 
 **Rich Console Output**: All user-facing output uses Rich library for:
@@ -272,7 +272,7 @@ def test_something(temp_dir):
 
 **Agent Template** (`fips-agents/agent-template` — monorepo, `templates/agent-loop/`):
 - `pyproject.toml` with project name (no entry point scripts)
-- `src/base_agent/` framework (NOT renamed during customization)
+- `src/agent.py` user agent subclass (lives at this path directly — no project-named module wrapper)
 - `chart/` Helm chart for OpenShift deployment
 - `agent.yaml` configuration (customized via `/plan-agent`, not during scaffolding)
 - `.claude/commands/` with agent development slash commands
