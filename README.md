@@ -913,6 +913,20 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.8.2
+
+- Test: New `TestGenerateMiddlewareRealTemplate` integration test renders the real v3.x middleware Jinja2 template against each `--hook-type` and the no-flag case, with templates committed under `tests/fixtures/middleware_template/` so the suite runs offline (#3)
+- Chore: `scripts/release.sh` now constructs the release commit message from the version argument using the project convention (`chore: Release fips-agents-cli vX.Y.Z` with optional ` — <summary>`); convention documented in CLAUDE.md (#4)
+- Docs: Drop broken `See Also` links from `.fips-agents-cli/README.md` in scaffolded MCP projects (#5, fixed in `fips-agents/mcp-server-template`)
+- Docs: Updated CLAUDE.md release section to reflect the new release-script signature
+
+### Version 0.8.1
+
+- Docs: Updated CLAUDE.md current-status line and added release-process notes
+- Chore: Repository hardening — added CODEOWNERS and enabled main branch protection
+- Chore: Black formatting drift cleanup; removed remaining "framework" language from docs in favor of "toolkit"
+- Chore: `.venv/` and `NEXT_SESSION.md` gitignored
+
 ### Version 0.8.0
 
 - Feature: New `--vendored` flag on `create agent` copies fipsagents source instead of PyPI dependency
