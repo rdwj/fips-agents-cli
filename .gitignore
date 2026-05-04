@@ -92,3 +92,6 @@ setup_structure.sh
 
 # Session handoff notes (local-only — content lives in MEMORY.md)
 NEXT_SESSION.md
+
+# Claude Code scheduled-task runtime lock — transient session state
+.claude/scheduled_tasks.lock
