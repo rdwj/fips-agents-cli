@@ -7,7 +7,17 @@ import click
 from rich.console import Console
 from rich.panel import Panel
 
+from fips_agents_cli.tools.modality import (
+    ModalityError,
+    ModalityResult,
+    ModalitySpec,
+    SourceFile,
+    apply_modality,
+)
+from fips_agents_cli.tools.project import find_agent_project_root
+
 console = Console()
+
 
 # The code_executor tool source, embedded directly to avoid network dependencies.
 # Source: agent-template/examples/code-sandbox-agent/tools/code_executor.py
@@ -83,13 +93,76 @@ async def code_executor(code: str, timeout: float = 10.0) -> str:
 '''
 
 
-def _find_agent_project_root() -> Path | None:
-    """Find the agent project root by looking for agent.yaml."""
-    current = Path.cwd()
-    for parent in [current] + list(current.parents):
-        if (parent / "agent.yaml").exists():
-            return parent
-    return None
+CODE_EXECUTOR_NEXT_STEPS = (
+    "1. Build or deploy the sandbox sidecar:",
+    "   [dim]fips-agents create sandbox my-sandbox[/dim]",
+    "   or use the pre-built image from fips-agents/code-sandbox",
+    "",
+    "2. Configure the sandbox URL for your agent:",
+    "",
+    "   [bold]Sidecar mode[/bold] (same pod, default):",
+    "     The tool defaults to http://localhost:8000",
+    "     No extra config needed if sandbox runs as a sidecar container.",
+    "",
+    "   [bold]Remote service mode[/bold] (separate deployment):",
+    "     Set the SANDBOX_URL environment variable:",
+    "     [dim]export SANDBOX_URL=http://sandbox-service:8000[/dim]",
+    "",
+    "3. The agent will auto-discover tools/code_executor.py.",
+    "   Use it in your agent's step() by calling:",
+    '     [dim]await self.use_tool("code_executor", code="print(1+1)")[/dim]',
+)
+
+
+CODE_EXECUTOR_SPEC = ModalitySpec(
+    name="code-executor",
+    description="Sandbox code execution",
+    chart_values_enable="sandbox.enabled",
+    source_files=(
+        SourceFile(
+            relative_path="tools/code_executor.py",
+            content=CODE_EXECUTOR_TOOL_SOURCE,
+        ),
+    ),
+    next_steps=CODE_EXECUTOR_NEXT_STEPS,
+)
+
+
+def _print_modality_result(spec: ModalitySpec, result: ModalityResult) -> None:
+    """Render the per-action lines + the success panel for an applied spec."""
+    for action in result.actions:
+        console.print(f"[green]+[/green] {action}")
+    for skipped in result.skipped:
+        console.print(f"[dim]{skipped}[/dim]")
+    for warning in result.warnings:
+        console.print(f"[yellow]Warning:[/yellow] {warning}")
+
+    body_lines = [f"[bold green]{spec.description} added.[/bold green]", ""]
+    if spec.next_steps:
+        body_lines.append("[bold cyan]Next Steps:[/bold cyan]")
+        body_lines.append("")
+        body_lines.extend(f"  {line}" for line in spec.next_steps)
+
+    console.print(
+        Panel(
+            "\n".join(body_lines),
+            border_style="green",
+            padding=(1, 2),
+        )
+    )
+
+
+def _resolve_agent_project_or_exit() -> Path:
+    project_root = find_agent_project_root()
+    if project_root is None:
+        console.print(
+            "[red]Error:[/red] Not in an agent project directory.\n"
+            "Could not find agent.yaml or .template-info in this directory or any parent.\n\n"
+            "[yellow]Hint:[/yellow] Run this command from an agent project "
+            "created with [dim]fips-agents create agent[/dim]."
+        )
+        sys.exit(1)
+    return project_root
 
 
 @click.group()
@@ -112,96 +185,16 @@ def code_executor_cmd():
         fips-agents add code-executor
     """
     try:
-        # Step 1: Detect project root
-        project_root = _find_agent_project_root()
-        if project_root is None:
-            console.print(
-                "[red]Error:[/red] Not in an agent project directory.\n"
-                "Could not find agent.yaml in this directory or any parent.\n\n"
-                "[yellow]Hint:[/yellow] Run this command from an agent project "
-                "created with [dim]fips-agents create agent[/dim]."
-            )
-            sys.exit(1)
-
+        project_root = _resolve_agent_project_or_exit()
         console.print(f"[green]Found project root:[/green] {project_root}")
 
-        # Step 2: Check tools/ directory exists
-        tools_dir = project_root / "tools"
-        if not tools_dir.exists():
-            console.print(
-                "[red]Error:[/red] No tools/ directory found in project root.\n\n"
-                "[yellow]Hint:[/yellow] Create it with: [dim]mkdir tools[/dim]"
-            )
+        try:
+            result = apply_modality(project_root, CODE_EXECUTOR_SPEC)
+        except ModalityError as e:
+            console.print(f"\n[red]Error:[/red] {e}")
             sys.exit(1)
 
-        # Step 3: Write the tool file
-        tool_file = tools_dir / "code_executor.py"
-        if tool_file.exists():
-            console.print(
-                "[yellow]Warning:[/yellow] tools/code_executor.py already exists. Skipping."
-            )
-        else:
-            tool_file.write_text(CODE_EXECUTOR_TOOL_SOURCE)
-            console.print("[green]+[/green] Created tools/code_executor.py")
-
-        # Step 4: Update chart/values.yaml if present
-        values_file = project_root / "chart" / "values.yaml"
-        if values_file.exists():
-            values_content = values_file.read_text()
-            if "sandbox:" in values_content:
-                if "enabled: false" in values_content:
-                    values_content = values_content.replace("enabled: false", "enabled: true", 1)
-                    values_file.write_text(values_content)
-                    console.print("[green]+[/green] Set sandbox.enabled: true in chart/values.yaml")
-                elif "enabled: true" in values_content:
-                    console.print("[dim]sandbox.enabled already true in chart/values.yaml[/dim]")
-                else:
-                    console.print(
-                        "[yellow]Warning:[/yellow] Found sandbox: section in "
-                        "chart/values.yaml but could not locate enabled field. "
-                        "Please set sandbox.enabled: true manually."
-                    )
-            else:
-                console.print(
-                    "[yellow]Warning:[/yellow] No sandbox: section in chart/values.yaml.\n"
-                    "  Add the following to your values.yaml:\n"
-                    "  [dim]sandbox:\n"
-                    "    enabled: true\n"
-                    "    image: <your-sandbox-image>[/dim]"
-                )
-        else:
-            console.print("[dim]No chart/values.yaml found (not using Helm chart). Skipping.[/dim]")
-
-        # Step 5: Success panel
-        next_steps = """
-[bold cyan]Next Steps:[/bold cyan]
-
-  1. Build or deploy the sandbox sidecar:
-     [dim]fips-agents create sandbox my-sandbox[/dim]
-     or use the pre-built image from fips-agents/code-sandbox
-
-  2. Configure the sandbox URL for your agent:
-
-     [bold]Sidecar mode[/bold] (same pod, default):
-       The tool defaults to http://localhost:8000
-       No extra config needed if sandbox runs as a sidecar container.
-
-     [bold]Remote service mode[/bold] (separate deployment):
-       Set the SANDBOX_URL environment variable:
-       [dim]export SANDBOX_URL=http://sandbox-service:8000[/dim]
-
-  3. The agent will auto-discover tools/code_executor.py.
-     Use it in your agent's step() by calling:
-       [dim]await self.use_tool("code_executor", code="print(1+1)")[/dim]
-"""
-
-        console.print(
-            Panel(
-                f"[bold green]Code executor tool added.[/bold green]\n{next_steps}",
-                border_style="green",
-                padding=(1, 2),
-            )
-        )
+        _print_modality_result(CODE_EXECUTOR_SPEC, result)
 
     except KeyboardInterrupt:
         console.print("\n[yellow]Operation cancelled.[/yellow]")

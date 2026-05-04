@@ -1,0 +1,13 @@
+{
+  "template": {
+    "type": "agent",
+    "url": "https://github.com/fips-agents/agent-template",
+    "subdir": "templates/agent-loop",
+    "commit": "fixture"
+  },
+  "project": {
+    "name": "fixture-agent"
+  },
+  "generated_at": "2026-05-04T00:00:00Z",
+  "fips_agents_cli_version": "fixture"
+}

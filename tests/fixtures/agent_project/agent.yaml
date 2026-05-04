@@ -1,0 +1,40 @@
+# agent.yaml — fixture mirroring a subset of agent-template/agent-loop.
+#
+# This is intentionally a small structural snapshot, not a full copy. It
+# carries enough of the real template's shape (nested `server.files`,
+# top-level `memory`, env-var substitution, comments) for tests of the
+# modality helper to exercise YAML round-tripping and dotted-key toggles.
+# Keep this in sync with the live template when adding fields the helper
+# tests need to touch.
+
+agent:
+  name: ${AGENT_NAME:-fixture-agent}
+  description: "Fixture agent for tests"
+  version: 0.1.0
+
+model:
+  provider: ${MODEL_PROVIDER:-openai}
+  endpoint: ${MODEL_ENDPOINT:-http://llamastack:8321/v1}
+  name: ${MODEL_NAME:-meta-llama/Llama-3.3-70B-Instruct}
+
+server:
+  host: ${HOST:-0.0.0.0}
+  port: ${PORT:-8080}
+
+  # -- File uploads (optional) ------------------------------------------------
+  # Disabled by default. Flip enabled via `fips-agents add files`.
+  files:
+    enabled: ${FILES_ENABLED:-false}
+    backend: ${FILES_BACKEND:-}
+    max_file_size_bytes: ${FILES_MAX_SIZE_BYTES:-52428800}
+
+  # -- Trace collection (optional) ---------------------------------------------
+  traces:
+    enabled: ${TRACES_ENABLED:-false}
+    sampling_rate: 1.0
+
+memory:
+  backend: ${MEMORY_BACKEND:-}
+
+logging:
+  level: ${LOG_LEVEL:-INFO}
