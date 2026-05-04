@@ -1,8 +1,10 @@
 """Validation utilities for MCP component generation."""
 
+import json
 import keyword
 import re
 from pathlib import Path
+from typing import Any
 
 import tomlkit
 from rich.console import Console
@@ -12,9 +14,11 @@ console = Console()
 
 def find_project_root() -> Path | None:
     """
-    Find the project root by walking up from current directory.
+    Find the MCP server project root by walking up from current directory.
 
-    Looks for pyproject.toml with fastmcp dependency to identify MCP server projects.
+    Looks for pyproject.toml with fastmcp dependency. Use this for commands
+    that are MCP-specific (add, generate). For commands that work across
+    project types (like patch), use find_fips_project_root() instead.
 
     Returns:
         Path: Project root path if found
@@ -47,6 +51,41 @@ def find_project_root() -> Path | None:
             except Exception as e:
                 console.print(f"[yellow]⚠[/yellow] Could not parse {pyproject_path}: {e}")
                 continue
+
+    return None
+
+
+def find_fips_project_root() -> tuple[Path, dict[str, Any]] | None:
+    """
+    Find any fips-agents-scaffolded project root by walking up from cwd.
+
+    Looks for the .template-info file written by `fips-agents create`. Works
+    for every project type (mcp-server, agent, workflow, gateway, ui, sandbox).
+
+    Backwards compat: projects scaffolded before .template-info gained the
+    `template.type` field will still be located, but the returned dict won't
+    include it. Callers should default a missing type to "mcp-server" — that
+    was the only patchable type at the time those projects were scaffolded.
+
+    Returns:
+        tuple: (project_root, template_info_dict) if found
+        None: If no .template-info file is found in the current directory or
+              any of its parents
+    """
+    current_path = Path.cwd()
+
+    for parent in [current_path] + list(current_path.parents):
+        info_file = parent / ".template-info"
+        if not info_file.exists():
+            continue
+
+        try:
+            with open(info_file) as f:
+                template_info = json.load(f)
+            return parent, template_info
+        except Exception as e:
+            console.print(f"[yellow]⚠[/yellow] Could not parse {info_file}: {e}")
+            continue
 
     return None
 
