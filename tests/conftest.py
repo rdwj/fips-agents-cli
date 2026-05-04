@@ -28,15 +28,13 @@ def mock_template_repo(temp_dir):
     template_dir.mkdir()
 
     # Create basic template structure
-    (template_dir / "pyproject.toml").write_text(
-        """[project]
+    (template_dir / "pyproject.toml").write_text("""[project]
 name = "mcp-server-template"
 version = "0.1.0"
 
 [project.scripts]
 mcp-server-template = "mcp_server_template.server:main"
-"""
-    )
+""")
 
     # Create src directory with module
     src_dir = template_dir / "src" / "mcp_server_template"
