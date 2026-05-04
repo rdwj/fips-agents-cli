@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from ruamel.yaml import YAML
 
 from fips_agents_cli.cli import cli
-from fips_agents_cli.commands.add import CODE_EXECUTOR_SPEC, FILES_SPEC
+from fips_agents_cli.commands.add import CODE_EXECUTOR_SPEC, FILES_SPEC, VISION_SPEC
 from fips_agents_cli.tools.modality import (
     ModalityError,
     ModalitySpec,
@@ -446,3 +446,98 @@ class TestFilesSpec:
         assert FILES_SPEC.source_files == ()
         assert FILES_SPEC.pyproject_extra is None
         assert FILES_SPEC.precondition is None
+
+
+class TestVisionSpec:
+    def test_spec_has_expected_shape(self) -> None:
+        # add vision drops a client example, gates on files being enabled,
+        # and otherwise touches no toggles — image input flows through the
+        # existing model.endpoint, no separate vision endpoint split.
+        assert VISION_SPEC.name == "vision"
+        assert VISION_SPEC.agent_yaml_enable is None
+        assert VISION_SPEC.chart_values_enable is None
+        assert VISION_SPEC.pyproject_extra is None
+        assert VISION_SPEC.precondition is not None
+        assert len(VISION_SPEC.source_files) == 1
+        assert VISION_SPEC.source_files[0].relative_path == "examples/vision_client.py"
+
+
+# ---------------------------------------------------------------------------
+# Integration — `fips-agents add vision` end-to-end
+# ---------------------------------------------------------------------------
+
+
+def _enable_files(agent_project: Path) -> None:
+    """Flip server.files.enabled to a literal True in the fixture's agent.yaml.
+
+    The fixture ships the field as ``${FILES_ENABLED:-false}`` (a string
+    with env-var substitution). The vision precondition checks for the
+    literal boolean True — same shape add files would leave behind.
+    """
+    yaml = YAML()
+    yaml.preserve_quotes = True
+    path = agent_project / "agent.yaml"
+    with open(path) as f:
+        data = yaml.load(f)
+    data["server"]["files"]["enabled"] = True
+    with open(path, "w") as f:
+        yaml.dump(data, f)
+
+
+class TestAddVisionE2E:
+    def test_first_run_drops_example_client(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _enable_files(agent_project)
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        result = runner.invoke(cli, ["add", "vision"])
+        assert result.exit_code == 0, result.output
+
+        example = agent_project / "examples" / "vision_client.py"
+        assert example.exists()
+        text = example.read_text()
+        # All three URL forms must appear in the example so users can
+        # copy any of them as a starting point. The data: form is built
+        # from an f-string so we match the constituent pieces.
+        assert "image_url" in text
+        assert "data:" in text and "base64" in text
+        assert "file_id:" in text
+        # POST /v1/files upload + chat completions both demonstrated.
+        assert "/v1/files" in text
+        assert "/v1/chat/completions" in text
+
+        assert "Multimodal image input" in result.output
+
+    def test_second_run_is_idempotent(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        _enable_files(agent_project)
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        runner.invoke(cli, ["add", "vision"])
+        result = runner.invoke(cli, ["add", "vision"])
+        assert result.exit_code == 0, result.output
+        assert "already exists" in result.output
+
+    def test_fails_when_files_not_enabled(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # Fixture ships server.files.enabled as a string, not True — the
+        # precondition must refuse to apply.
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        result = runner.invoke(cli, ["add", "vision"])
+        assert result.exit_code == 1
+        assert "fips-agents add files" in result.output
+        # Nothing was dropped.
+        assert not (agent_project / "examples" / "vision_client.py").exists()
+
+    def test_errors_when_not_in_an_agent_project(
+        self, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(tmp_path)
+        runner = CliRunner()
+        result = runner.invoke(cli, ["add", "vision"])
+        assert result.exit_code == 1
+        assert "Not in an agent project" in result.output
