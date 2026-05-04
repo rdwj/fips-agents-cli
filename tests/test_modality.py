@@ -10,7 +10,7 @@ from click.testing import CliRunner
 from ruamel.yaml import YAML
 
 from fips_agents_cli.cli import cli
-from fips_agents_cli.commands.add import CODE_EXECUTOR_SPEC
+from fips_agents_cli.commands.add import CODE_EXECUTOR_SPEC, FILES_SPEC
 from fips_agents_cli.tools.modality import (
     ModalityError,
     ModalitySpec,
@@ -353,7 +353,73 @@ class TestAddCodeExecutorE2E:
 
 
 # ---------------------------------------------------------------------------
-# Spec validation — the existing CODE_EXECUTOR_SPEC stays consistent
+# Integration — `fips-agents add files` end-to-end
+# ---------------------------------------------------------------------------
+
+
+class TestAddFilesE2E:
+    def test_first_run_flips_both_toggles(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        result = runner.invoke(cli, ["add", "files"])
+        assert result.exit_code == 0, result.output
+
+        agent_yaml = _yaml_load(agent_project / "agent.yaml")
+        assert agent_yaml["server"]["files"]["enabled"] is True
+
+        values = _yaml_load(agent_project / "chart" / "values.yaml")
+        assert values["files"]["enabled"] is True
+
+        assert "File upload and attachment support added" in result.output
+
+    def test_second_run_is_idempotent(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        runner.invoke(cli, ["add", "files"])
+        result = runner.invoke(cli, ["add", "files"])
+        assert result.exit_code == 0, result.output
+        # Both toggles must report skipped on the second pass.
+        assert result.output.count("already true") >= 2
+
+    def test_does_not_touch_pyproject_extras(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        # The agent template ships [files] = ["fipsagents[files]"] already;
+        # add files must not duplicate or rewrite it.
+        before = (agent_project / "pyproject.toml").read_text()
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        runner.invoke(cli, ["add", "files"])
+        after = (agent_project / "pyproject.toml").read_text()
+        assert before == after
+
+    def test_does_not_touch_unrelated_yaml_sections(
+        self, agent_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        monkeypatch.chdir(agent_project)
+        runner = CliRunner()
+        runner.invoke(cli, ["add", "files"])
+
+        agent_yaml = _yaml_load(agent_project / "agent.yaml")
+        # Unrelated sections preserved
+        assert agent_yaml["model"]["name"] == "${MODEL_NAME:-meta-llama/Llama-3.3-70B-Instruct}"
+        assert agent_yaml["server"]["traces"]["enabled"] == "${TRACES_ENABLED:-false}"
+        assert agent_yaml["memory"]["backend"] == "${MEMORY_BACKEND:-}"
+
+        values = _yaml_load(agent_project / "chart" / "values.yaml")
+        # Sandbox toggle untouched
+        assert values["sandbox"]["enabled"] is False
+        # Sibling files knobs untouched
+        assert values["files"]["persistence"]["enabled"] is False
+        assert values["files"]["virusScanner"]["enabled"] is False
+
+
+# ---------------------------------------------------------------------------
+# Spec validation — public specs stay consistent
 # ---------------------------------------------------------------------------
 
 
@@ -367,3 +433,16 @@ class TestCodeExecutorSpec:
         assert CODE_EXECUTOR_SPEC.pyproject_extra is None
         assert len(CODE_EXECUTOR_SPEC.source_files) == 1
         assert CODE_EXECUTOR_SPEC.source_files[0].relative_path == "tools/code_executor.py"
+
+
+class TestFilesSpec:
+    def test_spec_has_expected_shape(self) -> None:
+        # add files relies on the agent template already shipping the
+        # [files] extra and the full files surface; the spec only flips
+        # the two enabled toggles.
+        assert FILES_SPEC.name == "files"
+        assert FILES_SPEC.agent_yaml_enable == "server.files.enabled"
+        assert FILES_SPEC.chart_values_enable == "files.enabled"
+        assert FILES_SPEC.source_files == ()
+        assert FILES_SPEC.pyproject_extra is None
+        assert FILES_SPEC.precondition is None

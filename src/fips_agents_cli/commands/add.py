@@ -128,6 +128,42 @@ CODE_EXECUTOR_SPEC = ModalitySpec(
 )
 
 
+FILES_NEXT_STEPS = (
+    r"1. Install the \[files] extra (pulls in docling + python-magic):",
+    r"   [dim]pip install -e '.\[files]'[/dim]",
+    "",
+    "2. Choose a persistence backend by setting FILES_BACKEND:",
+    "   [bold]sqlite[/bold] (dev / single-replica)",
+    "     [dim]export FILES_BACKEND=sqlite[/dim]",
+    "   [bold]postgres[/bold] (production / multi-replica)",
+    "     [dim]export FILES_BACKEND=postgres[/dim]",
+    "     [dim]export DATABASE_URL=postgresql://...[/dim]",
+    "",
+    "3. (Optional) For multi-replica deployments use the S3 bytes backend:",
+    "   [dim]chart/values.yaml: files.bytesBackend.type=s3 + bucket/region/credentials[/dim]",
+    "",
+    "4. (Optional) Enable the ClamAV virus-scanner sidecar:",
+    "   [dim]chart/values.yaml: files.virusScanner.enabled=true[/dim]",
+    "",
+    "5. (Optional) Persist uploaded bytes across pod restarts (PVC):",
+    "   [dim]chart/values.yaml: files.persistence.enabled=true[/dim]",
+    "",
+    "6. Upload a file and reference it in chat completions:",
+    "   [dim]curl -F file=@doc.pdf $AGENT_URL/v1/files[/dim]",
+    "   The response carries a file_id; pass it on subsequent",
+    "   /v1/chat/completions requests via the file_ids field.",
+)
+
+
+FILES_SPEC = ModalitySpec(
+    name="files",
+    description="File upload and attachment support",
+    agent_yaml_enable="server.files.enabled",
+    chart_values_enable="files.enabled",
+    next_steps=FILES_NEXT_STEPS,
+)
+
+
 def _print_modality_result(spec: ModalitySpec, result: ModalityResult) -> None:
     """Render the per-action lines + the success panel for an applied spec."""
     for action in result.actions:
@@ -171,6 +207,28 @@ def add():
     pass
 
 
+def _run_modality(spec: ModalitySpec) -> None:
+    """Shared implementation for every `add <modality>` subcommand."""
+    try:
+        project_root = _resolve_agent_project_or_exit()
+        console.print(f"[green]Found project root:[/green] {project_root}")
+
+        try:
+            result = apply_modality(project_root, spec)
+        except ModalityError as e:
+            console.print(f"\n[red]Error:[/red] {e}")
+            sys.exit(1)
+
+        _print_modality_result(spec, result)
+
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operation cancelled.[/yellow]")
+        sys.exit(130)
+    except Exception as e:
+        console.print(f"\n[red]Error:[/red] {e}")
+        sys.exit(1)
+
+
 @add.command("code-executor")
 def code_executor_cmd():
     """Wire sandbox code execution into the current agent project.
@@ -184,21 +242,24 @@ def code_executor_cmd():
 
         fips-agents add code-executor
     """
-    try:
-        project_root = _resolve_agent_project_or_exit()
-        console.print(f"[green]Found project root:[/green] {project_root}")
+    _run_modality(CODE_EXECUTOR_SPEC)
 
-        try:
-            result = apply_modality(project_root, CODE_EXECUTOR_SPEC)
-        except ModalityError as e:
-            console.print(f"\n[red]Error:[/red] {e}")
-            sys.exit(1)
 
-        _print_modality_result(CODE_EXECUTOR_SPEC, result)
+@add.command("files")
+def files_cmd():
+    """Enable file upload + attachment support in the current agent project.
 
-    except KeyboardInterrupt:
-        console.print("\n[yellow]Operation cancelled.[/yellow]")
-        sys.exit(130)
-    except Exception as e:
-        console.print(f"\n[red]Error:[/red] {e}")
-        sys.exit(1)
+    Flips ``server.files.enabled`` in agent.yaml and ``files.enabled`` in
+    chart/values.yaml. The agent template already ships the rest of the
+    files surface (storage backends, S3, ClamAV sidecar, Docling parsing,
+    pgvector chunking) — this command only wires up the toggles. Follow
+    the printed next-steps to install the ``[files]`` extra and choose a
+    persistence backend.
+
+    Example:
+
+        cd my-research-agent
+
+        fips-agents add files
+    """
+    _run_modality(FILES_SPEC)
