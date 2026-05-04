@@ -1,0 +1,32 @@
+# Default values for fixture agent — mirrors a subset of agent-template's
+# Helm values.yaml shape. Carries the modality toggles that the helper's
+# tests need to flip (sandbox, files) plus an unrelated section so tests
+# can verify the helper does not touch fields it shouldn't.
+
+replicaCount: 1
+
+image:
+  repository: agent-template
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Code execution sandbox sidecar (optional) --------------------------------
+# Toggled by `fips-agents add code-executor`.
+sandbox:
+  enabled: false
+  profile: minimal
+  image:
+    repository: code-sandbox
+    tag: latest
+
+# -- File uploads + ClamAV sidecar (optional) ---------------------------------
+# Toggled by `fips-agents add files`.
+files:
+  enabled: false
+  backend: ""
+  persistence:
+    enabled: false
+    size: 5Gi
+  virusScanner:
+    enabled: false
+    failMode: open

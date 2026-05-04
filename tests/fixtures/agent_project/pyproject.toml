@@ -1,0 +1,17 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "fixture-agent"
+version = "0.1.0"
+description = "Fixture agent project for tests"
+requires-python = ">=3.10"
+dependencies = [
+    "fipsagents>=0.19",
+]
+
+[project.optional-dependencies]
+metrics = [
+    "prometheus-client>=0.20",
+]

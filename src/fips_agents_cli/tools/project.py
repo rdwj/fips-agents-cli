@@ -493,6 +493,50 @@ def customize_go_project(project_path: Path, new_name: str, sentinel: str) -> No
         raise
 
 
+def find_agent_project_root(start: Path | None = None) -> Path | None:
+    """Walk up from ``start`` to locate an agent project root.
+
+    Recognizes a directory as an agent project root when either is true:
+      - It carries a ``.template-info`` file whose ``template.type`` is
+        ``"agent"`` (preferred — this is what ``fips-agents create agent``
+        writes since v0.8.x).
+      - It contains an ``agent.yaml`` (legacy projects scaffolded before
+        ``.template-info`` carried ``template.type``, plus hand-rolled
+        agent projects that follow the template layout).
+
+    The dual check matches the contract of the existing ``add code-executor``
+    command (which only looked for ``agent.yaml``) while letting newer
+    callers prefer the explicit ``.template-info`` signal.
+
+    Args:
+        start: Directory to begin walking from. Defaults to ``Path.cwd()``.
+
+    Returns:
+        Path to the agent project root, or ``None`` if no agent project is
+        found in ``start`` or any of its parents.
+    """
+    cwd = start or Path.cwd()
+    for parent in [cwd] + list(cwd.parents):
+        info_file = parent / ".template-info"
+        if info_file.exists():
+            try:
+                with open(info_file) as f:
+                    template_info = json.load(f)
+                ptype = template_info.get("template", {}).get("type", "mcp-server")
+                if ptype == "agent":
+                    return parent
+                # Wrong project type at this level — keep walking. A user could
+                # be inside a subdir (e.g. examples/) of a non-agent project
+                # that itself contains an agent project elsewhere upstream.
+                continue
+            except Exception:
+                # Fall through to the agent.yaml legacy check below.
+                pass
+        if (parent / "agent.yaml").exists():
+            return parent
+    return None
+
+
 def cleanup_template_files(project_path: Path) -> None:
     """
     Remove template-specific files that shouldn't be in the new project.
