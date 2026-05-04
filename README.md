@@ -926,6 +926,17 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.10.0
+
+- Feature: New `tools/modality.py` helper exposing `ModalitySpec` + `apply_modality()` — declarative API for composable `add` subcommands that toggle agent.yaml / chart/values.yaml fields, drop in source files, and register pyproject.toml extras. Uses ruamel.yaml round-trip to preserve comments and `${VAR:-default}` substitutions; tomlkit for TOML edits. Idempotent, with a `precondition` hook for cross-modality dependency checks (#37)
+- Feature: New `fips-agents add files` command enables file upload + attachment support in existing agent projects. Flips `server.files.enabled` (agent.yaml) and `files.enabled` (chart/values.yaml); the agent template already ships the rest of the surface — storage backends, optional S3 bytes backend, ClamAV virus-scanner sidecar, Docling text extraction, pgvector chunking — so the command only owns the toggles (#19, #38)
+- Improvement: `add code-executor` refactored onto the new `ModalitySpec` helper. Brittle string-replace on `enabled: false` is replaced with structured ruamel.yaml round-trip; behavior preserved
+- Improvement: `_find_agent_project_root()` promoted from `commands/add.py` to `tools/project.py` as public `find_agent_project_root()`. Now recognizes both `.template-info` (`template.type=="agent"`) and legacy `agent.yaml` presence
+- Chore: Pin dev tools to `black>=26,<27` and `ruff>=0.11,<0.12` so local environments cannot silently drift past CI's formatter/linter major versions (#36)
+- Chore: New runtime dependency `ruamel.yaml>=0.18,<0.19` (used by the modality helper for comment-preserving YAML edits)
+- Chore: Descope governance issues #23 (cost tracking), #24 (HITL approval), #25 (compliance audit logging) — OGX (the new name for LlamaStack) handles these well; fips-agents-cli will not duplicate that surface
+- Tests: 29 new tests in `tests/test_modality.py` covering yaml toggles (top-level + nested), idempotency, missing-section warnings, source-file drops, pyproject extra add/merge, preconditions, and end-to-end runs of `add code-executor` and `add files`. New committed `tests/fixtures/agent_project/` provides an offline structural snapshot of the agent-template layout (precedent: `tests/fixtures/middleware_template/`)
+
 ### Version 0.9.1
 
 - Chore: Realign `tests/` formatting with black 26.3.1 to match CI (v0.9.0's release pipeline failed because local black 24.x produced different output than CI's 26.x; no functional change)
