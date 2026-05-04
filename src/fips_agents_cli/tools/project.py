@@ -648,7 +648,7 @@ def rewrite_pyproject_for_vendored(project_path: Path) -> None:
         "httpx",
         "python-frontmatter",
         "fastapi>=0.110",
-        'uvicorn[standard]>=0.27',
+        "uvicorn[standard]>=0.27",
     ]
 
     if "project" in pyproject and "dependencies" in pyproject["project"]:

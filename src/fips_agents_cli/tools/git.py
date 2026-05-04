@@ -62,8 +62,12 @@ def clone_template(repo_url: str, target_path: Path, branch: str = "main") -> st
 
 
 def clone_template_subdir(
-    repo_url: str, target_path: Path, subdir: str, branch: str = "main",
-    *, post_clone_fn: callable | None = None,
+    repo_url: str,
+    target_path: Path,
+    subdir: str,
+    branch: str = "main",
+    *,
+    post_clone_fn: callable | None = None,
 ) -> str:
     """
     Clone a monorepo and extract a subdirectory as the project root.
