@@ -574,7 +574,30 @@ All patch subcommands (except `check`) accept `--dry-run` to preview changes wit
 
 The `add` command group wires optional capabilities into existing agent projects created with `fips-agents create agent`.
 
-**Run these commands from within your agent project directory.** The CLI locates the project root by looking for `agent.yaml`.
+**Run these commands from within your agent project directory.** The CLI locates the project root by looking for `.template-info` (or `agent.yaml` for legacy projects).
+
+#### `add files`
+
+```bash
+fips-agents add files
+```
+
+Enables file upload + attachment support. Flips `server.files.enabled` in `agent.yaml` and `files.enabled` in `chart/values.yaml`. The agent template already ships the rest of the files surface (storage backends, optional S3 bytes backend, ClamAV virus-scanner sidecar, Docling PDF/text extraction, pgvector chunking) — this command only wires up the toggles.
+
+**What it does:**
+
+1. Sets `server.files.enabled: true` in `agent.yaml`
+2. Sets `files.enabled: true` in `chart/values.yaml`
+3. Prints next steps for installing the `[files]` extra, choosing a backend (`sqlite` / `postgres`), enabling ClamAV, and enabling persistence
+
+**Example:**
+
+```bash
+cd my-research-agent
+fips-agents add files
+pip install -e '.[files]'
+export FILES_BACKEND=sqlite
+```
 
 #### `add code-executor`
 
@@ -779,7 +802,7 @@ fips-agents-cli/
 │       ├── cli.py          # Main CLI application
 │       ├── version.py      # Version information
 │       ├── commands/       # CLI command implementations
-│       │   ├── add.py      # add code-executor (wire capabilities)
+│       │   ├── add.py      # add files / code-executor (wire capabilities)
 │       │   ├── create.py   # create mcp-server, agent, gateway, ui
 │       │   ├── generate.py # generate tool/resource/prompt/middleware
 │       │   ├── model_car.py # create model-car
