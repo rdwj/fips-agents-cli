@@ -202,7 +202,7 @@ fips-agents create agent my-agent --github --org fips-agents
 # Non-interactive mode
 fips-agents create agent my-agent --yes --local
 
-# Create with vendored framework source
+# Create with vendored fipsagents source
 fips-agents create agent my-agent --vendored --local
 ```
 
@@ -616,7 +616,7 @@ fips-agents add code-executor
 
 ### Vendor Commands
 
-The `vendor` command copies the fipsagents framework source into your agent project, replacing the PyPI dependency. This gives you full control over the framework code.
+The `vendor` command copies the fipsagents source into your agent project, replacing the PyPI dependency. This gives you full control over the fipsagents code.
 
 #### `vendor`
 
@@ -648,8 +648,8 @@ fips-agents vendor --update
 
 **When to use vendored vs. PyPI:**
 
-- **PyPI dependency** (default): Best for teams running multiple agents that share the same framework version. Centralized updates.
-- **Vendored source**: Best for agents that need custom BaseAgent modifications, environments with no PyPI access, or when you want to read and debug the framework source locally.
+- **PyPI dependency** (default): Best for teams running multiple agents that share the same fipsagents version. Centralized updates.
+- **Vendored source**: Best for agents that need custom BaseAgent modifications, environments with no PyPI access, or when you want to read and debug the fipsagents source locally.
 
 ## Project Name Requirements
 

@@ -67,9 +67,7 @@ def vendor(update: bool, tag: str | None):
 
         if is_already_vendored and not update:
             # Show current version and ask if they want to update
-            console.print(
-                "[yellow]⚠[/yellow] fipsagents is already vendored in this project."
-            )
+            console.print("[yellow]⚠[/yellow] fipsagents is already vendored in this project.")
             console.print(f"  Marker: {vendored_marker}")
             console.print("  Use --update to refresh from upstream.")
             sys.exit(0)
@@ -77,8 +75,7 @@ def vendor(update: bool, tag: str | None):
         # Warn about overwriting local changes
         if update:
             console.print(
-                "\n[yellow]⚠[/yellow] This will overwrite src/fipsagents/ with "
-                "upstream source."
+                "\n[yellow]⚠[/yellow] This will overwrite src/fipsagents/ with " "upstream source."
             )
             console.print(
                 "  Commit any local modifications first to preserve them in git history.\n"

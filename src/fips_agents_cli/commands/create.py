@@ -507,10 +507,13 @@ def agent(
                 post_clone = None
                 if vendored:
                     from fips_agents_cli.tools.project import vendor_fipsagents_from_clone
+
                     post_clone = vendor_fipsagents_from_clone
 
                 template_commit = clone_template_subdir(
-                    AGENT_TEMPLATE_URL, target_path, AGENT_TEMPLATE_SUBDIR,
+                    AGENT_TEMPLATE_URL,
+                    target_path,
+                    AGENT_TEMPLATE_SUBDIR,
                     post_clone_fn=post_clone,
                 )
             except Exception as e:
@@ -534,6 +537,7 @@ def agent(
                 cleanup_template_files(target_path)
                 if vendored:
                     from fips_agents_cli.tools.project import rewrite_pyproject_for_vendored
+
                     rewrite_pyproject_for_vendored(target_path)
                 if template_commit:
                     write_template_info(
