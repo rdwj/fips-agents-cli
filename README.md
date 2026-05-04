@@ -957,6 +957,13 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.11.0
+
+- Feature: New `fips-agents add vision` command wires multimodal (image input) example client code into existing agent projects (#20, #39). Drops `examples/vision_client.py` showing the three `image_url` URL forms the agent runtime accepts: inline `data:` URIs, remote `https://` URLs, and the internal `file_id:<id>` scheme that the agent rewrites to a `data:` URI server-side via the configured `BytesStore`. Image input flows through the agent's existing `model.endpoint` — no separate vision endpoint split. Set `MODEL_ENDPOINT` and `MODEL_NAME` to a vision-capable model (Granite Vision 3.2-2B, LLaVA, Phi-4-Multimodal) before running the agent
+- Behavior: `add vision` enforces a precondition — `server.files.enabled` must be `true` in `agent.yaml`. The `file_id:<id>` URL scheme resolves bytes via the `BytesStore`, which only exists when files is enabled. The command refuses to apply with an actionable hint pointing the user to `fips-agents add files` first
+- Compat: Pairs with `fipsagents>=0.20.0` (content-block support landed runtime-side in agent-template #151 / fipsagents 0.20.0)
+- Tests: 4 new tests in `tests/test_modality.py` covering vision spec shape, end-to-end first-run + idempotency, the files-not-enabled precondition failure, and the not-in-agent-project error path
+
 ### Version 0.10.0
 
 - Feature: New `tools/modality.py` helper exposing `ModalitySpec` + `apply_modality()` — declarative API for composable `add` subcommands that toggle agent.yaml / chart/values.yaml fields, drop in source files, and register pyproject.toml extras. Uses ruamel.yaml round-trip to preserve comments and `${VAR:-default}` substitutions; tomlkit for TOML edits. Idempotent, with a `precondition` hook for cross-modality dependency checks (#37)
