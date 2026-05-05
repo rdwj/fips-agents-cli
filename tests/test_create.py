@@ -978,3 +978,68 @@ class TestCreateUi:
         assert result.exit_code == 0
         assert "Successfully created chat UI project" in result.output
         assert "my-chat-ui" in result.output
+
+
+class TestDetermineGithubMode:
+    """Tests for _determine_github_mode helper.
+
+    Regression coverage for issue #40: non-TTY shells (CI, agent-driven) hung
+    on the `Create GitHub repository?` prompt and exited with an empty
+    `Unexpected error:` message.
+    """
+
+    def _call(self, **overrides):
+        from fips_agents_cli.commands.create import _determine_github_mode
+
+        kwargs = {"use_github": False, "use_local": False, "yes": False}
+        kwargs.update(overrides)
+        return _determine_github_mode(**kwargs)
+
+    def test_local_flag_short_circuits(self):
+        with patch("sys.stdin.isatty", return_value=False):
+            assert self._call(use_local=True) is False
+
+    def test_github_flag_short_circuits(self):
+        assert self._call(use_github=True) is True
+
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=False)
+    def test_falls_back_to_local_when_gh_missing(self, _mock_installed):
+        assert self._call() is False
+
+    @patch("fips_agents_cli.commands.create.is_gh_authenticated", return_value=False)
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=True)
+    def test_falls_back_to_local_when_gh_unauthenticated(self, *_mocks):
+        assert self._call() is False
+
+    @patch("fips_agents_cli.commands.create.is_gh_authenticated", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=True)
+    def test_yes_flag_chooses_github_when_gh_available(self, *_mocks):
+        assert self._call(yes=True) is True
+
+    @patch("sys.stdin.isatty", return_value=False)
+    @patch("fips_agents_cli.commands.create.is_gh_authenticated", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=True)
+    def test_non_tty_falls_back_to_local_without_prompting(self, *_mocks):
+        # The fix for issue #40: never prompt when stdin isn't a TTY.
+        with patch("click.confirm") as mock_confirm:
+            assert self._call() is False
+            mock_confirm.assert_not_called()
+
+    @patch("sys.stdin.isatty", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_authenticated", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=True)
+    def test_tty_prompts_user(self, *_mocks):
+        with patch("click.confirm", return_value=True) as mock_confirm:
+            assert self._call() is True
+            mock_confirm.assert_called_once()
+
+    @patch("sys.stdin.isatty", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_authenticated", return_value=True)
+    @patch("fips_agents_cli.commands.create.is_gh_installed", return_value=True)
+    def test_tty_with_aborted_confirm_falls_back_to_local(self, *_mocks):
+        # Defensive: if the prompt aborts (e.g. closed stdin while isatty
+        # claimed otherwise), we should not crash with `Unexpected error:`.
+        import click as _click
+
+        with patch("click.confirm", side_effect=_click.exceptions.Abort()):
+            assert self._call() is False

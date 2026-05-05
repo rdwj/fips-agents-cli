@@ -317,7 +317,7 @@ def mcp_server(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -603,7 +603,7 @@ def agent(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -862,7 +862,7 @@ def workflow(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -1121,7 +1121,7 @@ def gateway(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -1380,7 +1380,7 @@ def ui(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -1637,7 +1637,7 @@ def sandbox(
         console.print("\n[yellow]⚠[/yellow] Operation cancelled by user")
         sys.exit(130)
     except Exception as e:
-        console.print(f"\n[red]✗[/red] Unexpected error: {e}")
+        console.print(f"\n[red]✗[/red] Unexpected error: {e!r}")
         sys.exit(1)
 
 
@@ -1677,9 +1677,26 @@ def _determine_github_mode(use_github: bool, use_local: bool, yes: bool) -> bool
         console.print("[dim]Mode: GitHub (--yes with gh available)[/dim]")
         return True
 
+    # No TTY available (CI, agent-driven shells, piped input): can't prompt.
+    # Default to local; users opt in to GitHub with --github or --yes.
+    if not sys.stdin.isatty():
+        console.print(
+            "[dim]Mode: Local only (non-interactive shell — pass --github or --yes "
+            "to create a GitHub repo)[/dim]"
+        )
+        return False
+
     # Interactive: prompt user
     console.print("[cyan]GitHub CLI detected and authenticated.[/cyan]")
-    return click.confirm("Create GitHub repository?", default=True)
+    try:
+        return click.confirm("Create GitHub repository?", default=True)
+    except click.exceptions.Abort:
+        # Stdin closed mid-prompt (isatty lied, or input ended). Fall back to local.
+        console.print(
+            "\n[dim]Mode: Local only (no input available — pass --github or --yes "
+            "to create a GitHub repo)[/dim]"
+        )
+        return False
 
 
 def _show_success_message(
