@@ -957,6 +957,12 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.11.1
+
+- Fix: `fips-agents create` no longer hangs on the `Create GitHub repository?` prompt in non-interactive shells (CI, agent-driven, piped input). All six `create` subcommands share a single `_determine_github_mode` helper, so `gateway`, `ui`, `mcp-server`, `agent`, `workflow`, and `sandbox` are fixed together. Non-TTY stdin now falls through to local mode with a one-line hint pointing to `--github` / `--yes`; the prompt is also wrapped in `try/except click.exceptions.Abort` as defense in depth (#40, #41)
+- Fix: Six `Unexpected error: {e}` sites now use `{e!r}` so a swallowed empty-message exception (the original symptom of #40, where `click.Abort` rendered as a blank message) surfaces its type instead of going silent
+- Tests: 8 new cases in `TestDetermineGithubMode` covering flag short-circuits, gh-missing/unauthenticated, `--yes`, and the new TTY / non-TTY / aborted-confirm paths
+
 ### Version 0.11.0
 
 - Feature: New `fips-agents add vision` command wires multimodal (image input) example client code into existing agent projects (#20, #39). Drops `examples/vision_client.py` showing the three `image_url` URL forms the agent runtime accepts: inline `data:` URIs, remote `https://` URLs, and the internal `file_id:<id>` scheme that the agent rewrites to a `data:` URI server-side via the configured `BytesStore`. Image input flows through the agent's existing `model.endpoint` — no separate vision endpoint split. Set `MODEL_ENDPOINT` and `MODEL_NAME` to a vision-capable model (Granite Vision 3.2-2B, LLaVA, Phi-4-Multimodal) before running the agent
