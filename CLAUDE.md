@@ -10,7 +10,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 The `patch` command is type-aware via `template.type` in `.template-info`:
 - **MCP server** projects expose `patch generators | core | docs | build | claude`.
-- **Agent / workflow** projects expose `patch chart | docs | build | claude`.
+- **Agent / workflow** projects expose `patch chart | docs | build | claude | evals`.
 Running an MCP-only subcommand inside an agent project (or vice versa) exits with a clear "available categories" error. `patch check` and `patch all` work for any supported type.
 
 ## Development Commands

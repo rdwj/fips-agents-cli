@@ -157,6 +157,23 @@ def claude(dry_run: bool):
     _patch_category("claude", dry_run)
 
 
+@patch.command("evals")
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show what would be updated without making changes",
+)
+def evals(dry_run: bool):
+    """
+    Update the eval harness (agent / workflow projects only).
+
+    Patches discovery / assertions / runner / mock_factory under evals/.
+    evals/evals.yaml and evals/fixtures/ are user-authored and never
+    patched.
+    """
+    _patch_category("evals", dry_run)
+
+
 @patch.command("all")
 @click.option(
     "--dry-run",
