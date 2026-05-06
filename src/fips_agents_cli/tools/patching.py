@@ -27,9 +27,10 @@ MCP_FILE_CATEGORIES = {
     "core": {
         "description": "Core infrastructure (server, auth, etc)",
         "patterns": [
+            "src/main.py",
             "src/core/server.py",
             "src/core/auth.py",
-            "src/*/__ init__.py",  # Package __init__ files
+            "src/*/__init__.py",  # Package __init__ files
             "conftest.py",
         ],
         "ask_before_patch": True,  # May be customized
@@ -39,8 +40,12 @@ MCP_FILE_CATEGORIES = {
         "patterns": [
             "docs/**/*",
             "*/examples/**/*",  # Examples in any directory
+            "AGENTS.md",
             "CLAUDE.md",
             "ARCHITECTURE.md",
+            "CONTRIBUTING.md",
+            "DEVELOPMENT_PROCESS.md",
+            "OPENSHIFT_DEPLOYMENT.md",
             "TESTING.md",
         ],
         "ask_before_patch": False,  # Usually safe to update
@@ -53,8 +58,18 @@ MCP_FILE_CATEGORIES = {
             "openshift.yaml",
             "deploy.sh",
             "remove_examples.sh",
+            ".dockerignore",
+            ".gitignore",
+            ".gitleaks.toml",
         ],
         "ask_before_patch": True,  # May be customized
+    },
+    "claude": {
+        "description": "Claude Code slash commands shipped with the template",
+        "patterns": [
+            ".claude/commands/**/*",
+        ],
+        "ask_before_patch": False,  # Safe to overwrite
     },
 }
 
@@ -105,9 +120,10 @@ AGENT_FILE_CATEGORIES = {
         "ask_before_patch": True,  # May be customized
     },
     "claude": {
-        "description": "Claude Code slash commands shipped with the template",
+        "description": "Claude Code slash commands and rules shipped with the template",
         "patterns": [
             ".claude/commands/**/*",
+            ".claude/rules/**/*",
         ],
         "ask_before_patch": False,  # Safe to overwrite
     },
@@ -119,8 +135,14 @@ AGENT_NEVER_PATCH = [
     "agent.yaml",  # User's agent config
     "chart/values.yaml",  # User's deploy values
     "src/fipsagents/**",  # Vendored — managed by `fips-agents vendor --update`
+    "tools/**",  # User-authored tools (target of `fips-agents add code-executor`)
+    "examples/**",  # User-authored examples (target of `fips-agents add vision`)
+    "prompts/**",  # User-customized agent prompts
+    "rules/**",  # User-customized agent rules
+    "skills/**",  # User-customized agent skills
     "tests/**/*.py",
     ".env*",
+    ".memoryhub.yaml",  # User-customized memory hub config
     "README.md",
     "pyproject.toml",  # User may have added dependencies
 ]
