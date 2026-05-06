@@ -200,6 +200,205 @@ class TestFindFipsProjectRoot:
 
 
 # ---------------------------------------------------------------------------
+# Unit tests — .fips-template.yaml manifest loader (issue #45)
+# ---------------------------------------------------------------------------
+
+
+def _write_manifest(template_root: Path, body: str) -> Path:
+    """Drop a `.fips-template.yaml` file into a template root for testing."""
+    manifest = template_root / ".fips-template.yaml"
+    manifest.write_text(body)
+    return manifest
+
+
+class TestLoadTemplateManifest:
+    def test_returns_none_when_manifest_absent(self, tmp_path):
+        # Legacy template — no manifest, no warning, falls through silently
+        assert patching._load_template_manifest(tmp_path) is None
+
+    def test_loads_well_formed_manifest(self, tmp_path):
+        _write_manifest(
+            tmp_path,
+            "schema_version: 1\npatch:\n  categories: {}\n  never_patch: []\n",
+        )
+        manifest = patching._load_template_manifest(tmp_path)
+        assert manifest is not None
+        assert manifest["schema_version"] == 1
+
+    def test_returns_none_on_malformed_yaml(self, tmp_path, capsys):
+        _write_manifest(tmp_path, "this is: : not valid: yaml: at: all:\n  - [bad")
+        assert patching._load_template_manifest(tmp_path) is None
+        # The user is told why we fell back — no silent surprise
+        captured = capsys.readouterr()
+        assert "Could not parse" in captured.out or "fall" in captured.out.lower()
+
+    def test_returns_none_when_root_is_not_mapping(self, tmp_path, capsys):
+        _write_manifest(tmp_path, "- just a list\n- nothing useful\n")
+        assert patching._load_template_manifest(tmp_path) is None
+
+    def test_returns_none_for_unsupported_schema_version(self, tmp_path, capsys):
+        _write_manifest(tmp_path, "schema_version: 99\npatch: {}\n")
+        assert patching._load_template_manifest(tmp_path) is None
+        captured = capsys.readouterr()
+        assert "schema_version" in captured.out
+
+    def test_returns_none_when_schema_version_missing(self, tmp_path):
+        # Explicit contract — no schema_version means the file is not for us
+        _write_manifest(tmp_path, "patch:\n  categories: {}\n")
+        assert patching._load_template_manifest(tmp_path) is None
+
+
+class TestCategoriesFromManifest:
+    def test_extracts_categories_and_never_patch(self):
+        manifest = {
+            "schema_version": 1,
+            "patch": {
+                "categories": {
+                    "chart": {
+                        "description": "Helm chart templates",
+                        "patterns": ["chart/templates/**/*"],
+                        "ask_before_patch": True,
+                    },
+                    "claude": {
+                        "description": "Claude Code commands",
+                        "patterns": [".claude/commands/**/*"],
+                        "ask_before_patch": False,
+                    },
+                },
+                "never_patch": ["src/agent.py", "agent.yaml"],
+            },
+        }
+        result = patching._categories_from_manifest(manifest)
+        assert result is not None
+        cats, never = result
+        assert set(cats.keys()) == {"chart", "claude"}
+        assert cats["chart"]["patterns"] == ["chart/templates/**/*"]
+        assert cats["chart"]["ask_before_patch"] is True
+        assert cats["claude"]["ask_before_patch"] is False
+        assert never == ["src/agent.py", "agent.yaml"]
+
+    def test_fills_in_default_description(self):
+        # description is optional; defaults to the category name
+        manifest = {
+            "patch": {
+                "categories": {
+                    "build": {"patterns": ["Makefile"]},
+                },
+                "never_patch": [],
+            },
+        }
+        result = patching._categories_from_manifest(manifest)
+        assert result is not None
+        cats, _ = result
+        assert cats["build"]["description"] == "build"
+
+    def test_defaults_ask_before_patch_to_false(self):
+        manifest = {
+            "patch": {
+                "categories": {
+                    "build": {"patterns": ["Makefile"]},
+                },
+                "never_patch": [],
+            },
+        }
+        cats, _ = patching._categories_from_manifest(manifest)
+        assert cats["build"]["ask_before_patch"] is False
+
+    def test_defaults_never_patch_to_empty(self):
+        manifest = {"patch": {"categories": {}}}
+        result = patching._categories_from_manifest(manifest)
+        assert result is not None
+        _, never = result
+        assert never == []
+
+    def test_returns_none_when_patch_block_missing(self):
+        assert patching._categories_from_manifest({"schema_version": 1}) is None
+
+    def test_returns_none_when_categories_not_a_mapping(self):
+        manifest = {"patch": {"categories": ["chart", "build"]}}
+        assert patching._categories_from_manifest(manifest) is None
+
+    def test_returns_none_when_patterns_missing(self):
+        manifest = {
+            "patch": {
+                "categories": {"build": {"description": "no patterns"}},
+            },
+        }
+        assert patching._categories_from_manifest(manifest) is None
+
+    def test_returns_none_when_pattern_is_not_a_string(self):
+        manifest = {
+            "patch": {
+                "categories": {"build": {"patterns": ["Makefile", 42]}},
+            },
+        }
+        assert patching._categories_from_manifest(manifest) is None
+
+
+class TestResolveCategories:
+    """`_resolve_categories` is the integration point: prefer the manifest
+    when valid, otherwise fall back to the constants keyed by project type.
+    """
+
+    def test_falls_back_to_constants_when_manifest_absent(self, tmp_path):
+        info = {"template": {"type": "agent"}}
+        cats, never = patching._resolve_categories(tmp_path, info)
+        assert cats is patching.AGENT_FILE_CATEGORIES
+        assert never is patching.AGENT_NEVER_PATCH
+
+    def test_manifest_overrides_constants(self, tmp_path):
+        _write_manifest(
+            tmp_path,
+            """\
+schema_version: 1
+patch:
+  categories:
+    only-this:
+      description: A custom category
+      patterns:
+        - foo/bar.txt
+      ask_before_patch: true
+  never_patch:
+    - keep/me.yaml
+""",
+        )
+        info = {"template": {"type": "agent"}}
+        cats, never = patching._resolve_categories(tmp_path, info)
+        assert set(cats.keys()) == {"only-this"}
+        assert cats["only-this"]["description"] == "A custom category"
+        assert never == ["keep/me.yaml"]
+
+    def test_falls_back_when_manifest_is_malformed(self, tmp_path, capsys):
+        # Manifest exists but is missing required fields
+        _write_manifest(tmp_path, "schema_version: 1\npatch:\n  not_categories: 42\n")
+        info = {"template": {"type": "mcp-server"}}
+        cats, never = patching._resolve_categories(tmp_path, info)
+        assert cats is patching.MCP_FILE_CATEGORIES
+        assert never is patching.MCP_NEVER_PATCH
+        captured = capsys.readouterr()
+        assert "missing required fields" in captured.out
+
+    def test_manifest_works_for_unsupported_project_type(self, tmp_path):
+        # `gateway` raises in get_categories_for_type, so before #45 it
+        # was unpatchable. With a manifest the template can opt in.
+        _write_manifest(
+            tmp_path,
+            """\
+schema_version: 1
+patch:
+  categories:
+    chart:
+      patterns: [chart/templates/**/*]
+  never_patch: []
+""",
+        )
+        info = {"template": {"type": "gateway"}}
+        cats, never = patching._resolve_categories(tmp_path, info)
+        assert "chart" in cats
+        assert never == []
+
+
+# ---------------------------------------------------------------------------
 # Unit tests — _clone_template_for_patch handles subdirs
 # ---------------------------------------------------------------------------
 
@@ -402,3 +601,40 @@ class TestPatchAgentE2E:
         # Must enumerate the available agent categories
         for cat in AGENT_FILE_CATEGORIES:
             assert cat in result.output
+
+    def test_template_manifest_overrides_constants_in_check(
+        self, agent_project, monkeypatch, cli_runner
+    ):
+        # When a template ships .fips-template.yaml, those categories
+        # are what `patch check` reports — not the hardcoded constants.
+        def fake_clone(url, target_path, branch=None):
+            sub = target_path / "templates" / "agent-loop"
+            _make_fake_agent_template(sub)
+            # Drift a file the manifest's custom category covers
+            (sub / "Makefile").write_text("# UPDATED via manifest category\n")
+            (sub / ".fips-template.yaml").write_text("""\
+schema_version: 1
+patch:
+  categories:
+    template-managed:
+      description: Template-managed scaffolding files
+      patterns:
+        - Makefile
+        - Containerfile
+      ask_before_patch: true
+  never_patch:
+    - chart/values.yaml
+""")
+            return "manifestcommit"
+
+        monkeypatch.setattr(patching, "clone_template", fake_clone)
+        monkeypatch.chdir(agent_project)
+
+        result = cli_runner.invoke(cli, ["patch", "check"])
+        assert result.exit_code == 0, result.output
+        assert "Available Updates" in result.output
+        # Manifest's category name surfaces
+        assert "template-managed" in result.output
+        # Built-in agent categories that are NOT in the manifest must NOT show
+        assert "chart" not in result.output
+        assert "claude" not in result.output

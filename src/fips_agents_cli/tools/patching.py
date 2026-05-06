@@ -10,10 +10,20 @@ from typing import Any
 import click
 from rich.console import Console
 from rich.syntax import Syntax
+from ruamel.yaml import YAML
 
 from fips_agents_cli.tools.git import clone_template
 
 console = Console()
+
+# Filename a template repo can ship at its comparison root to declare its own
+# patch categories, overriding the hardcoded MCP_/AGENT_ constants below.
+TEMPLATE_MANIFEST_FILENAME = ".fips-template.yaml"
+
+# Schema version the CLI knows how to read. Manifests with a different value
+# are treated as unsupported — the CLI falls back to the built-in constants
+# and warns the user.
+SUPPORTED_MANIFEST_SCHEMA_VERSION = 1
 
 # File categories for MCP server projects
 MCP_FILE_CATEGORIES = {
@@ -262,6 +272,117 @@ def _clone_template_for_patch(template_info: dict[str, Any], temp_path: Path) ->
     return template_root
 
 
+def _load_template_manifest(template_root: Path) -> dict[str, Any] | None:
+    """Read ``.fips-template.yaml`` from the comparison root, if present.
+
+    The manifest lets a template repo declare its own patch categories
+    rather than relying on the CLI's hardcoded MCP_/AGENT_ constants.
+    See issue #45 for the schema and rollout plan.
+
+    Returns the parsed dict on success, or ``None`` when:
+      - the file does not exist (legacy template — fall back silently);
+      - the file is malformed YAML or not a mapping (warn, fall back);
+      - ``schema_version`` is missing or unsupported (warn, fall back).
+    """
+    manifest_path = template_root / TEMPLATE_MANIFEST_FILENAME
+    if not manifest_path.exists():
+        return None
+
+    try:
+        yaml = YAML(typ="safe")
+        with open(manifest_path) as f:
+            data = yaml.load(f)
+    except Exception as e:
+        console.print(
+            f"[yellow]⚠[/yellow] Could not parse {TEMPLATE_MANIFEST_FILENAME} "
+            f"({e}); falling back to built-in patch categories."
+        )
+        return None
+
+    if not isinstance(data, dict):
+        console.print(
+            f"[yellow]⚠[/yellow] {TEMPLATE_MANIFEST_FILENAME} is not a mapping; "
+            "falling back to built-in patch categories."
+        )
+        return None
+
+    schema_version = data.get("schema_version")
+    if schema_version != SUPPORTED_MANIFEST_SCHEMA_VERSION:
+        console.print(
+            f"[yellow]⚠[/yellow] {TEMPLATE_MANIFEST_FILENAME} schema_version "
+            f"{schema_version!r} is not supported by this CLI "
+            f"(want {SUPPORTED_MANIFEST_SCHEMA_VERSION}); falling back to "
+            "built-in patch categories."
+        )
+        return None
+
+    return data
+
+
+def _categories_from_manifest(
+    manifest: dict[str, Any],
+) -> tuple[dict[str, dict[str, Any]], list[str]] | None:
+    """Translate a parsed manifest into the (categories, never_patch) shape
+    the rest of the patcher already understands.
+
+    Returns ``None`` when the manifest is structurally wrong — caller should
+    warn and fall back to the constants. Recoverable defaults (missing
+    ``description``, missing ``ask_before_patch``) are filled in here.
+    """
+    patch_block = manifest.get("patch")
+    if not isinstance(patch_block, dict):
+        return None
+
+    raw_categories = patch_block.get("categories")
+    if not isinstance(raw_categories, dict):
+        return None
+
+    raw_never_patch = patch_block.get("never_patch", [])
+    if not isinstance(raw_never_patch, list):
+        return None
+
+    categories: dict[str, dict[str, Any]] = {}
+    for name, config in raw_categories.items():
+        if not isinstance(name, str) or not isinstance(config, dict):
+            return None
+        patterns = config.get("patterns")
+        if not isinstance(patterns, list) or not all(isinstance(p, str) for p in patterns):
+            return None
+        categories[name] = {
+            "description": str(config.get("description", name)),
+            "patterns": list(patterns),
+            "ask_before_patch": bool(config.get("ask_before_patch", False)),
+        }
+
+    never_patch = [str(p) for p in raw_never_patch]
+    return categories, never_patch
+
+
+def _resolve_categories(
+    template_root: Path, template_info: dict[str, Any]
+) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Return ``(categories, never_patch)`` for the cloned template.
+
+    Prefers the template's ``.fips-template.yaml`` manifest when present
+    and well-formed. Falls back to the hardcoded constants keyed by
+    ``template.type`` for any other case (file missing, malformed,
+    unsupported schema version).
+    """
+    manifest = _load_template_manifest(template_root)
+    if manifest is not None:
+        resolved = _categories_from_manifest(manifest)
+        if resolved is not None:
+            return resolved
+        console.print(
+            f"[yellow]⚠[/yellow] {TEMPLATE_MANIFEST_FILENAME} present but "
+            "missing required fields; falling back to built-in patch "
+            "categories."
+        )
+
+    project_type = get_project_type(template_info)
+    return get_categories_for_type(project_type)
+
+
 def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict[str, Any]:
     """
     Check what files have changed in template since project creation.
@@ -274,8 +395,6 @@ def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict
         dict: Dictionary of categories with changed files
     """
     template_url = template_info["template"]["url"]
-    project_type = get_project_type(template_info)
-    file_categories, _ = get_categories_for_type(project_type)
 
     console.print(f"[cyan]Fetching latest template from {template_url}...[/cyan]")
 
@@ -283,6 +402,7 @@ def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         template_root = _clone_template_for_patch(template_info, temp_path)
+        file_categories, _ = _resolve_categories(template_root, template_info)
 
         updates = {}
 
@@ -334,27 +454,46 @@ def patch_category(
         tuple: (success, message)
     """
     project_type = get_project_type(template_info)
-    file_categories, never_patch = get_categories_for_type(project_type)
+    template_url = template_info["template"]["url"]
 
-    if category not in file_categories:
-        available = ", ".join(file_categories.keys()) or "(none)"
+    # Pre-clone fast-fail: if `category` is not in the project type's
+    # built-in category set, refuse before paying for a clone. The
+    # manifest can override patterns/never_patch for known categories
+    # but cannot introduce new category names — those would have no
+    # Click subcommand registered for them anyway.
+    builtin_categories, _ = get_categories_for_type(project_type)
+    if category not in builtin_categories:
+        available = ", ".join(builtin_categories.keys()) or "(none)"
         return (
             False,
             f"Category '{category}' is not valid for {project_type} projects. "
             f"Available: {available}",
         )
 
-    config = file_categories[category]
-    template_url = template_info["template"]["url"]
-
     console.print(f"\n[bold cyan]Patching Category: {category}[/bold cyan]")
-    console.print(f"[dim]{config['description']}[/dim]\n")
 
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
         console.print(f"[cyan]Fetching template from {template_url}...[/cyan]")
         template_root = _clone_template_for_patch(template_info, temp_path)
         console.print("[green]✓[/green] Template fetched\n")
+
+        # Resolve categories from manifest (when present) or hardcoded constants.
+        # Done post-clone so a template's .fips-template.yaml can override the
+        # patterns / ask_before_patch / never_patch for built-in categories.
+        file_categories, never_patch = _resolve_categories(template_root, template_info)
+
+        if category not in file_categories:
+            # Manifest dropped a built-in category. Rare but possible.
+            available = ", ".join(file_categories.keys()) or "(none)"
+            return (
+                False,
+                f"Category '{category}' is not declared by this template. "
+                f"Available: {available}",
+            )
+
+        config = file_categories[category]
+        console.print(f"[dim]{config['description']}[/dim]\n")
 
         files_patched = 0
         files_skipped = 0
