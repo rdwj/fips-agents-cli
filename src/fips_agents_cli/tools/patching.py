@@ -1,6 +1,7 @@
 """Utilities for patching projects with template updates."""
 
 import difflib
+import fnmatch
 import json
 import shutil
 import tempfile
@@ -555,12 +556,23 @@ def _files_identical(file1: Path, file2: Path) -> bool:
 
 
 def _should_never_patch(file_path: Path, never_patch: list[str]) -> bool:
-    """Check if a file should never be patched, given the rule list."""
+    """Return True when ``file_path`` matches any never-patch pattern.
+
+    Patterns are matched against the full relative path with
+    :func:`fnmatch.fnmatchcase`. This anchors the comparison to the
+    whole path rather than the right-hand side of it, so a bare entry
+    like ``"README.md"`` matches only the project-root README and not
+    nested READMEs like ``evals/README.md``. See issue #47.
+
+    Note that fnmatch's ``*`` is greedy and matches across path
+    separators — for our never-patch use case that loosens existing
+    patterns slightly (e.g. ``src/tools/*.py`` now also matches
+    ``src/tools/sub/foo.py``). This is safer for never-patch since
+    the goal is to keep the user's code off-limits; over-matching
+    here protects more, not less.
+    """
     file_str = str(file_path)
-    for pattern in never_patch:
-        if Path(file_str).match(pattern):
-            return True
-    return False
+    return any(fnmatch.fnmatchcase(file_str, pattern) for pattern in never_patch)
 
 
 def _show_diff_and_ask(
