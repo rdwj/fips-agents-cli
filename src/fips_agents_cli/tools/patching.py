@@ -26,6 +26,18 @@ TEMPLATE_MANIFEST_FILENAME = ".fips-template.yaml"
 # and warns the user.
 SUPPORTED_MANIFEST_SCHEMA_VERSION = 1
 
+
+class PatchUnsupportedForProjectType(Exception):
+    """Raised when patch is invoked on a project whose template type has no
+    built-in category set and ships no usable .fips-template.yaml manifest.
+
+    Today this hits ``sandbox`` projects (whose template repo has not yet
+    shipped a manifest) and any future project type added to ``create``
+    before its template gains a manifest. Callers in the CLI layer catch
+    this and print a clean message instead of letting a traceback escape.
+    """
+
+
 # File categories for MCP server projects
 MCP_FILE_CATEGORIES = {
     "generators": {
@@ -368,6 +380,11 @@ def _resolve_categories(
     and well-formed. Falls back to the hardcoded constants keyed by
     ``template.type`` for any other case (file missing, malformed,
     unsupported schema version).
+
+    Raises :class:`PatchUnsupportedForProjectType` when no manifest is
+    usable AND the project type has no built-in category set (today:
+    ``sandbox``). Callers in the CLI layer catch this and emit a clean
+    message instead of letting a traceback escape.
     """
     manifest = _load_template_manifest(template_root)
     if manifest is not None:
@@ -381,7 +398,17 @@ def _resolve_categories(
         )
 
     project_type = get_project_type(template_info)
-    return get_categories_for_type(project_type)
+    try:
+        return get_categories_for_type(project_type)
+    except ValueError as e:
+        raise PatchUnsupportedForProjectType(
+            f"Patching is not supported for project type '{project_type}'. "
+            f"The template repo for this project type does not yet ship a "
+            f"{TEMPLATE_MANIFEST_FILENAME} manifest, and no built-in "
+            f"category set exists for it. See "
+            f"https://github.com/fips-agents/fips-agents-cli/issues/45 "
+            f"for the manifest schema."
+        ) from e
 
 
 def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict[str, Any]:
@@ -394,6 +421,11 @@ def check_for_updates(project_path: Path, template_info: dict[str, Any]) -> dict
 
     Returns:
         dict: Dictionary of categories with changed files
+
+    Raises:
+        PatchUnsupportedForProjectType: When the project's template type has
+            no built-in category set and no usable manifest. Callers should
+            catch this and surface a clean message.
     """
     template_url = template_info["template"]["url"]
 
@@ -462,8 +494,16 @@ def patch_category(
     # manifest can override patterns/never_patch for known categories
     # but cannot introduce new category names — those would have no
     # Click subcommand registered for them anyway.
-    builtin_categories, _ = get_categories_for_type(project_type)
-    if category not in builtin_categories:
+    #
+    # When the project type has no built-in category set (sandbox today),
+    # we can't fast-fail — the manifest is the only source of truth, so
+    # we have to clone first and let _resolve_categories do its thing.
+    try:
+        builtin_categories, _ = get_categories_for_type(project_type)
+    except ValueError:
+        builtin_categories = None
+
+    if builtin_categories is not None and category not in builtin_categories:
         available = ", ".join(builtin_categories.keys()) or "(none)"
         return (
             False,
@@ -482,7 +522,10 @@ def patch_category(
         # Resolve categories from manifest (when present) or hardcoded constants.
         # Done post-clone so a template's .fips-template.yaml can override the
         # patterns / ask_before_patch / never_patch for built-in categories.
-        file_categories, never_patch = _resolve_categories(template_root, template_info)
+        try:
+            file_categories, never_patch = _resolve_categories(template_root, template_info)
+        except PatchUnsupportedForProjectType as e:
+            return False, str(e)
 
         if category not in file_categories:
             # Manifest dropped a built-in category. Rare but possible.
