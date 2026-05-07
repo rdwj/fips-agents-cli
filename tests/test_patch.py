@@ -165,6 +165,95 @@ class TestAgentNeverPatchExtensions:
         assert expected in AGENT_NEVER_PATCH
 
 
+class TestShouldNeverPatch:
+    """Issue #47: bare patterns like "README.md" used to match nested
+    files (evals/README.md, docs/foo/README.md) because Path.match
+    matches from the right. The matcher now anchors to the full path
+    via fnmatch.fnmatchcase.
+    """
+
+    @pytest.mark.parametrize(
+        "rel_path,expected",
+        [
+            # The bug from #47 — bare README.md must NOT lock out nested ones
+            ("evals/README.md", False),
+            ("docs/sub/README.md", False),
+            # The project-root README.md must still be protected
+            ("README.md", True),
+            # Negative: a non-README file is unaffected
+            ("evals/discovery.py", False),
+        ],
+    )
+    def test_bare_filename_matches_only_root(self, rel_path, expected):
+        # Minimal never_patch list — just the bare filename
+        assert patching._should_never_patch(Path(rel_path), ["README.md"]) is expected
+
+    @pytest.mark.parametrize(
+        "rel_path,expected",
+        [
+            ("agent.yaml", True),
+            ("not-agent.yaml", False),
+            ("chart/values.yaml", True),
+            ("chart/templates/values.yaml", False),
+            ("src/agent.py", True),
+            ("src/agents.py", False),
+        ],
+    )
+    def test_exact_path_patterns(self, rel_path, expected):
+        patterns = ["agent.yaml", "chart/values.yaml", "src/agent.py"]
+        assert patching._should_never_patch(Path(rel_path), patterns) is expected
+
+    @pytest.mark.parametrize(
+        "rel_path,expected",
+        [
+            ("src/fipsagents/foo.py", True),
+            ("src/fipsagents/sub/foo.py", True),
+            ("src/fipsagents/sub/deeper/foo.py", True),
+            ("src/other/foo.py", False),
+        ],
+    )
+    def test_recursive_glob(self, rel_path, expected):
+        assert patching._should_never_patch(Path(rel_path), ["src/fipsagents/**"]) is expected
+
+    @pytest.mark.parametrize(
+        "rel_path,expected",
+        [
+            # tests/**/*.py requires at least one nested directory
+            ("tests/foo/bar.py", True),
+            ("tests/foo/bar/baz.py", True),
+            ("tests/foo.py", False),  # No nested dir
+            ("other/foo.py", False),
+        ],
+    )
+    def test_tests_recursive_pattern(self, rel_path, expected):
+        assert patching._should_never_patch(Path(rel_path), ["tests/**/*.py"]) is expected
+
+    @pytest.mark.parametrize(
+        "rel_path,expected",
+        [
+            (".env", True),
+            (".env.local", True),
+            (".env.production", True),
+            ("env", False),
+            ("not-.env", False),
+        ],
+    )
+    def test_dotenv_glob(self, rel_path, expected):
+        assert patching._should_never_patch(Path(rel_path), [".env*"]) is expected
+
+    def test_empty_pattern_list_never_matches(self):
+        assert patching._should_never_patch(Path("anything.py"), []) is False
+
+    def test_real_never_patch_lists_protect_root_readme_only(self):
+        # Regression: the actual constants must not lock out evals/README.md
+        # (which the agent template ships as part of the eval harness).
+        assert patching._should_never_patch(Path("README.md"), AGENT_NEVER_PATCH) is True
+        assert patching._should_never_patch(Path("evals/README.md"), AGENT_NEVER_PATCH) is False
+        # Same expectation for the MCP list
+        assert patching._should_never_patch(Path("README.md"), MCP_NEVER_PATCH) is True
+        assert patching._should_never_patch(Path("docs/README.md"), MCP_NEVER_PATCH) is False
+
+
 # ---------------------------------------------------------------------------
 # Unit tests — find_fips_project_root walks up to .template-info
 # ---------------------------------------------------------------------------
