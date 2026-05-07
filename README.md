@@ -969,6 +969,11 @@ MIT License - see LICENSE file for details
 
 ## Changelog
 
+### Version 0.12.1
+
+- Fix: `fips-agents patch check`, `patch <category>`, and `patch all` now produce a single-line ✗ error instead of a Python traceback when run against a project whose template type is not in the built-in category set AND ships no `.fips-template.yaml` manifest. Today this hits sandbox projects (whose template repo has not yet shipped a manifest); the message names the project type, points at the manifest filename, and links to issue #45 for the schema (#50, #51)
+- Tests: 9 new tests in `tests/test_patch.py` — 4 unit cases on the new `PatchUnsupportedForProjectType` exception, 4 integration cases exercising the three CLI entry points against a fake sandbox project, and a future-proofing test confirming that once a sandbox manifest exists, `patch check` works without further CLI changes
+
 ### Version 0.12.0
 
 - Feature: `fips-agents patch` now reads `.fips-template.yaml` from cloned templates and uses it as the source of truth for patch categories and never-patch lists, falling back to the hardcoded constants when the file is absent or malformed (#45, #48). Each template repo can declare what is template-managed vs user-authored without a CLI release. Companion manifests landed in `agent-template`, `mcp-server-template`, `gateway-template`, and `ui-template` — gateway/ui projects, which previously raised `ValueError` from `patch check`, now opt in to patching via their manifest
