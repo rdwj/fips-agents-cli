@@ -56,6 +56,83 @@ class TestGetCategoriesForType:
             assert "framework" not in config["description"].lower()
 
 
+class TestMcpCategoryPatterns:
+    """Patterns for MCP categories must match the files the template ships.
+
+    Regression tests for issue #42: the original `core` patterns had a literal
+    space in `src/*/__ init__.py`, and `claude` was missing entirely.
+    """
+
+    def test_core_init_pattern_has_no_space_typo(self):
+        # `src/*/__init__.py` must NOT have a space — that pattern matched nothing
+        patterns = MCP_FILE_CATEGORIES["core"]["patterns"]
+        assert "src/*/__init__.py" in patterns
+        assert not any(" " in p for p in patterns), patterns
+
+    def test_core_init_pattern_matches_real_init_files(self):
+        # Path.match validates the fix — a real package __init__.py matches now
+        assert Path("src/core/__init__.py").match("src/*/__init__.py")
+        assert Path("src/middleware/__init__.py").match("src/*/__init__.py")
+
+    def test_core_includes_main_entry_point(self):
+        # src/main.py is the MCP server entry point and ships with the template
+        assert "src/main.py" in MCP_FILE_CATEGORIES["core"]["patterns"]
+
+    def test_claude_category_exists_for_mcp(self):
+        # MCP template ships .claude/commands/*.md — must be patchable
+        assert "claude" in MCP_FILE_CATEGORIES
+        patterns = MCP_FILE_CATEGORIES["claude"]["patterns"]
+        assert ".claude/commands/**/*" in patterns
+        assert MCP_FILE_CATEGORIES["claude"]["ask_before_patch"] is False
+
+    def test_docs_includes_recently_added_files(self):
+        # AGENTS.md, CONTRIBUTING.md and friends ship in the MCP template root
+        patterns = MCP_FILE_CATEGORIES["docs"]["patterns"]
+        for expected in [
+            "AGENTS.md",
+            "CONTRIBUTING.md",
+            "DEVELOPMENT_PROCESS.md",
+            "OPENSHIFT_DEPLOYMENT.md",
+        ]:
+            assert expected in patterns, f"{expected} missing from MCP docs patterns"
+
+    def test_build_includes_root_dotfiles(self):
+        patterns = MCP_FILE_CATEGORIES["build"]["patterns"]
+        for expected in [".dockerignore", ".gitignore", ".gitleaks.toml"]:
+            assert expected in patterns, f"{expected} missing from MCP build patterns"
+
+
+class TestAgentCategoryPatterns:
+    """Regression tests for issue #42: agent template gaps."""
+
+    def test_claude_category_includes_rules(self):
+        # Agent template ships .claude/rules/agent-development.md
+        patterns = AGENT_FILE_CATEGORIES["claude"]["patterns"]
+        assert ".claude/commands/**/*" in patterns
+        assert ".claude/rules/**/*" in patterns
+
+
+class TestAgentNeverPatchExtensions:
+    """`add` writes user-customized files into well-known directories.
+    Those paths must be in NEVER_PATCH so a future pattern broadening
+    cannot clobber them.
+    """
+
+    @pytest.mark.parametrize(
+        "expected",
+        [
+            "tools/**",
+            "examples/**",
+            "prompts/**",
+            "rules/**",
+            "skills/**",
+            ".memoryhub.yaml",
+        ],
+    )
+    def test_user_directory_is_never_patched(self, expected):
+        assert expected in AGENT_NEVER_PATCH
+
+
 # ---------------------------------------------------------------------------
 # Unit tests — find_fips_project_root walks up to .template-info
 # ---------------------------------------------------------------------------

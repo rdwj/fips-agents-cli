@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 **Current Status:** Scaffolding commands implemented: `create mcp-server`, `create agent`, `create gateway`, `create ui`, `create sandbox`, `create model-car`. Post-scaffolding commands: `generate` (tool, resource, prompt, middleware), `patch` (check, all + type-specific category subcommands — see below), `add` (code-executor, files, vision), `vendor`. Note: `create workflow` exists in code but is not yet working.
 
 The `patch` command is type-aware via `template.type` in `.template-info`:
-- **MCP server** projects expose `patch generators | core | docs | build`.
+- **MCP server** projects expose `patch generators | core | docs | build | claude`.
 - **Agent / workflow** projects expose `patch chart | docs | build | claude`.
 Running an MCP-only subcommand inside an agent project (or vice versa) exits with a clear "available categories" error. `patch check` and `patch all` work for any supported type.
 

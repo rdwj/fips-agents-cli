@@ -149,9 +149,10 @@ def chart(dry_run: bool):
 )
 def claude(dry_run: bool):
     """
-    Update Claude Code slash commands (agent / workflow projects only).
+    Update Claude Code slash commands and rules.
 
     Patches files under .claude/commands/ that ship with the template.
+    For agent / workflow projects also patches .claude/rules/.
     """
     _patch_category("claude", dry_run)
 
