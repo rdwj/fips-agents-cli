@@ -487,6 +487,50 @@ patch:
         assert never == []
 
 
+class TestPatchUnsupportedForProjectType:
+    """Issue #50: when the project type has no built-in category set and
+    no usable manifest, _resolve_categories raises a clean exception
+    that the CLI layer can catch — no Python tracebacks for sandbox
+    users (today) or for any future template that hasn't shipped a
+    manifest yet.
+    """
+
+    @pytest.mark.parametrize("project_type", ["sandbox", "bogus"])
+    def test_resolve_categories_raises_when_no_manifest_and_unsupported_type(
+        self, tmp_path, project_type
+    ):
+        # No manifest in tmp_path, project type has no constants — must raise
+        info = {"template": {"type": project_type}}
+        with pytest.raises(patching.PatchUnsupportedForProjectType, match=project_type):
+            patching._resolve_categories(tmp_path, info)
+
+    def test_resolve_categories_raises_when_manifest_malformed_and_unsupported(self, tmp_path):
+        # Manifest present but useless (missing required fields). Falls back
+        # to constants which raise — that ValueError must convert to the
+        # cleaner PatchUnsupportedForProjectType.
+        _write_manifest(tmp_path, "schema_version: 1\npatch:\n  not_categories: 42\n")
+        info = {"template": {"type": "sandbox"}}
+        with pytest.raises(patching.PatchUnsupportedForProjectType, match="sandbox"):
+            patching._resolve_categories(tmp_path, info)
+
+    def test_error_message_mentions_manifest_filename(self, tmp_path):
+        info = {"template": {"type": "sandbox"}}
+        try:
+            patching._resolve_categories(tmp_path, info)
+        except patching.PatchUnsupportedForProjectType as e:
+            assert ".fips-template.yaml" in str(e)
+        else:  # pragma: no cover
+            pytest.fail("expected PatchUnsupportedForProjectType")
+
+    def test_supported_types_still_work_without_manifest(self, tmp_path):
+        # Regression: agent / mcp-server / workflow must still fall back to
+        # constants without the new exception interfering.
+        for project_type in ("agent", "workflow", "mcp-server"):
+            info = {"template": {"type": project_type}}
+            cats, _ = patching._resolve_categories(tmp_path, info)
+            assert cats  # non-empty
+
+
 # ---------------------------------------------------------------------------
 # Unit tests — _clone_template_for_patch handles subdirs
 # ---------------------------------------------------------------------------
@@ -727,3 +771,129 @@ patch:
         # Built-in agent categories that are NOT in the manifest must NOT show
         assert "chart" not in result.output
         assert "claude" not in result.output
+
+
+# ---------------------------------------------------------------------------
+# E2E test — issue #50: graceful error when project type has no manifest
+# ---------------------------------------------------------------------------
+
+
+def _make_fake_sandbox_project(project_root: Path) -> None:
+    """Build a minimal scaffolded sandbox project. Sandbox is the canonical
+    'no manifest, no built-in category set' case today.
+    """
+    project_root.mkdir(parents=True, exist_ok=True)
+    (project_root / "Makefile").write_text("# sandbox makefile\n")
+    (project_root / "pyproject.toml").write_text('[project]\nname = "my-sandbox"\n')
+
+    info = {
+        "generator": {"tool": "fips-agents-cli", "version": "0.0.0-test"},
+        "template": {
+            "url": "https://github.com/fips-agents/code-sandbox",
+            "type": "sandbox",
+            "commit": "abcdef123456",
+            "full_commit": "abcdef1234567890",
+        },
+        "project": {"name": "my-sandbox", "created_at": "2026-01-01T00:00:00+00:00"},
+    }
+    (project_root / ".template-info").write_text(json.dumps(info, indent=2))
+
+
+class TestPatchUnsupportedTypeE2E:
+    """Issue #50: gateway / ui / sandbox projects whose template ships no
+    manifest must produce clean errors, not Python tracebacks.
+
+    Uses sandbox as the test subject because gateway / ui / agent / mcp
+    all ship manifests as of v0.12.0 — sandbox is the only type still
+    bare in the wild.
+    """
+
+    @pytest.fixture
+    def sandbox_project(self, tmp_path):
+        project = tmp_path / "my-sandbox"
+        _make_fake_sandbox_project(project)
+        return project
+
+    def test_patch_check_exits_cleanly_with_helpful_message(
+        self, sandbox_project, monkeypatch, cli_runner
+    ):
+        # Clone returns a bare template with no manifest — the worst case
+        def fake_clone(url, target_path, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "Makefile").write_text("# upstream\n")
+            return "deadbeef0000"
+
+        monkeypatch.setattr(patching, "clone_template", fake_clone)
+        monkeypatch.chdir(sandbox_project)
+
+        result = cli_runner.invoke(cli, ["patch", "check"])
+        assert result.exit_code == 1, result.output
+        # No Python traceback escaped
+        assert "Traceback" not in result.output
+        # Clean message, mentions the project type and the manifest filename
+        assert "sandbox" in result.output
+        assert ".fips-template.yaml" in result.output
+
+    def test_patch_category_exits_cleanly_with_helpful_message(
+        self, sandbox_project, monkeypatch, cli_runner
+    ):
+        def fake_clone(url, target_path, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            return "deadbeef0000"
+
+        monkeypatch.setattr(patching, "clone_template", fake_clone)
+        monkeypatch.chdir(sandbox_project)
+
+        # Use any registered subcommand — `chart` is fine, the failure mode
+        # is "no built-in categories at all", not a category mismatch.
+        result = cli_runner.invoke(cli, ["patch", "chart"])
+        assert result.exit_code == 1, result.output
+        assert "Traceback" not in result.output
+        assert "sandbox" in result.output
+        assert ".fips-template.yaml" in result.output
+
+    def test_patch_all_exits_cleanly_with_helpful_message(
+        self, sandbox_project, monkeypatch, cli_runner
+    ):
+        # `patch all` fails at pre-clone (get_available_categories) for
+        # unsupported types — should not bubble ValueError.
+        called = {"clone": False}
+
+        def fake_clone(url, target_path, branch=None):
+            called["clone"] = True
+            return "x"
+
+        monkeypatch.setattr(patching, "clone_template", fake_clone)
+        monkeypatch.chdir(sandbox_project)
+
+        result = cli_runner.invoke(cli, ["patch", "all"])
+        assert result.exit_code == 1, result.output
+        assert "Traceback" not in result.output
+        assert "sandbox" in result.output
+        # Pre-clone fast-fail — should not have cloned anything
+        assert called["clone"] is False
+
+    def test_manifest_makes_sandbox_patchable(self, sandbox_project, monkeypatch, cli_runner):
+        # Once the sandbox template ships a manifest, `patch check` works
+        # — this test future-proofs the fix.
+        def fake_clone(url, target_path, branch=None):
+            target_path.mkdir(parents=True, exist_ok=True)
+            (target_path / "Makefile").write_text("# upstream sandbox makefile\n")
+            (target_path / ".fips-template.yaml").write_text("""\
+schema_version: 1
+patch:
+  categories:
+    build:
+      patterns: [Makefile]
+      ask_before_patch: true
+  never_patch: []
+""")
+            return "deadbeef0000"
+
+        monkeypatch.setattr(patching, "clone_template", fake_clone)
+        monkeypatch.chdir(sandbox_project)
+
+        result = cli_runner.invoke(cli, ["patch", "check"])
+        assert result.exit_code == 0, result.output
+        # Drift in build surfaces because the project's Makefile differs
+        assert "build" in result.output

@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from fips_agents_cli.tools.patching import (
+    PatchUnsupportedForProjectType,
     check_for_updates,
     get_available_categories,
     get_project_type,
@@ -48,7 +49,11 @@ def check():
     console.print(f"  Created: {template_info['project']['created_at']}\n")
 
     # Check for updates
-    updates = check_for_updates(project_root, template_info)
+    try:
+        updates = check_for_updates(project_root, template_info)
+    except PatchUnsupportedForProjectType as e:
+        console.print(f"\n[red]✗[/red] {e}")
+        sys.exit(1)
 
     if not updates:
         console.print("[green]✓[/green] Project is up to date with latest template!")
@@ -203,13 +208,27 @@ def all_categories(dry_run: bool, skip_confirmation: bool):
     _, template_info = found
     project_type = get_project_type(template_info)
 
+    # Pre-clone fast-fail: enumerate built-in categories for the project type.
+    # If the type has no built-in set (e.g. sandbox), tell the user upfront —
+    # iterating manifest categories without a Click subcommand for each is a
+    # bigger refactor (see #50 / #45).
+    try:
+        categories = get_available_categories(project_type)
+    except ValueError:
+        console.print(
+            f"\n[red]✗[/red] Patching is not supported for project type "
+            f"'{project_type}'. The template repo for this project type does "
+            f"not yet ship a .fips-template.yaml manifest. See "
+            f"https://github.com/fips-agents/fips-agents-cli/issues/45."
+        )
+        sys.exit(1)
+
     if not skip_confirmation:
         confirm = click.confirm("This will update multiple files. Continue?", default=True)
         if not confirm:
             console.print("[yellow]Cancelled[/yellow]")
             sys.exit(0)
 
-    categories = get_available_categories(project_type)
     for category in categories:
         console.print(f"\n[bold]Processing category: {category}[/bold]")
         _patch_category(category, dry_run, skip_confirmation=skip_confirmation)
