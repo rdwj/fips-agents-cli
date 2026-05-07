@@ -526,7 +526,9 @@ When using `--params` with `generate tool` or `generate prompt`, provide a JSON 
 
 The `patch` command group updates files in existing projects from the upstream template repository without overwriting your custom code. It shows interactive diffs for files that may contain customizations.
 
-Supported project types: **MCP server**, **agent**, **workflow**. The available category subcommands depend on the project type — `patch` reads `template.type` from `.template-info` and surfaces a clear error if you run a category that doesn't apply (e.g. `patch generators` inside an agent project).
+Supported project types: **MCP server**, **agent**, **workflow**, **gateway**, **UI**. The available category subcommands depend on the project type — `patch` reads `template.type` from `.template-info` and surfaces a clear error if you run a category that doesn't apply (e.g. `patch generators` inside an agent project).
+
+Templates can declare their own patch categories by shipping a `.fips-template.yaml` manifest at the repo root (or, for monorepo templates, at the comparison subdir root). The CLI prefers the manifest when present and falls back to a built-in category set otherwise. Gateway and UI projects are patchable only because their templates ship a manifest.
 
 Run these commands from within your project directory.
 
@@ -551,9 +553,10 @@ Update every category that applies to the current project type. Prompts for conf
 | Subcommand           | Patches                                                                  |
 |----------------------|--------------------------------------------------------------------------|
 | `patch generators`   | Jinja2 templates in `.fips-agents-cli/generators/`                       |
-| `patch core`         | Core infrastructure (loaders, server bootstrap)                          |
-| `patch docs`         | Documentation files and examples                                         |
-| `patch build`        | Build and deployment files (Makefile, Containerfile)                     |
+| `patch core`         | Core infrastructure (`src/main.py`, `src/core/server.py`, package inits) |
+| `patch docs`         | `CLAUDE.md`, `AGENTS.md`, `ARCHITECTURE.md`, `TESTING.md`, `docs/**`     |
+| `patch build`        | `Makefile`, `Containerfile`, `.dockerignore`, `.gitignore`               |
+| `patch claude`       | Claude Code slash commands (`.claude/commands/**`)                       |
 
 #### Agent / workflow categories
 
@@ -562,9 +565,18 @@ Update every category that applies to the current project type. Prompts for conf
 | `patch chart`  | Helm chart templates (`chart/templates/**`, `chart/Chart.yaml`)                |
 | `patch docs`   | `CLAUDE.md`, `AGENTS.md`, `docs/**`                                            |
 | `patch build`  | `Makefile`, `Containerfile`, `deploy.sh`, `redeploy.sh`                        |
-| `patch claude` | Claude Code slash commands shipped with the template (`.claude/commands/**`)   |
+| `patch claude` | Claude Code slash commands and rules (`.claude/commands/**`, `.claude/rules/**`) |
+| `patch evals`  | Eval harness (`evals/discovery.py`, `evals/assertions.py`, `evals/run_evals.py`) |
 
-User-customized files are never patched: for MCP this means `src/tools/`, `src/resources/`, `src/prompts/`, `src/middleware/`, `pyproject.toml`, etc. For agent/workflow it means `src/agent.py`, `agent.yaml`, `chart/values.yaml`, `src/fipsagents/**` (managed by `fips-agents vendor`), and `pyproject.toml`.
+#### Gateway / UI categories
+
+| Subcommand     | Patches                                                              |
+|----------------|----------------------------------------------------------------------|
+| `patch chart`  | Helm chart templates (`chart/templates/**`, `chart/Chart.yaml`)       |
+| `patch docs`   | `CLAUDE.md`, `llms.txt`, `docs/**`                                    |
+| `patch build`  | `Makefile`, `Containerfile`, `.containerignore`, `.gitignore`         |
+
+User-customized files are never patched: for MCP this means `src/tools/`, `src/resources/`, `src/prompts/`, `src/middleware/`, `pyproject.toml`, etc. For agent/workflow it means `src/agent.py`, `agent.yaml`, `chart/values.yaml`, `src/fipsagents/**` (managed by `fips-agents vendor`), `tools/**`, `examples/**`, `prompts/**`, `rules/**`, `skills/**`, `evals/evals.yaml`, `evals/fixtures/**`, and `pyproject.toml`. For gateway/UI it means `cmd/**`, `internal/**`, `go.mod`, `go.sum`, `chart/values.yaml`, `static/**` (UI only), `bin/**`, and `LICENSE`.
 
 All patch subcommands (except `check`) accept `--dry-run` to preview changes without modifying files.
 
@@ -956,6 +968,16 @@ MIT License - see LICENSE file for details
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
 ## Changelog
+
+### Version 0.12.0
+
+- Feature: `fips-agents patch` now reads `.fips-template.yaml` from cloned templates and uses it as the source of truth for patch categories and never-patch lists, falling back to the hardcoded constants when the file is absent or malformed (#45, #48). Each template repo can declare what is template-managed vs user-authored without a CLI release. Companion manifests landed in `agent-template`, `mcp-server-template`, `gateway-template`, and `ui-template` — gateway/ui projects, which previously raised `ValueError` from `patch check`, now opt in to patching via their manifest
+- Feature: New `evals` category for agent / workflow projects covers the eval harness (`evals/discovery.py`, `evals/assertions.py`, `evals/mock_factory.py`, `evals/run_evals.py`, `evals/__init__.py`, `evals/README.md`) (#44, #46). User-authored `evals/evals.yaml` and `evals/fixtures/` stay in `AGENT_NEVER_PATCH`
+- Feature: New `claude` category for MCP server projects covers `.claude/commands/**/*` (#42, #43). Agent `claude` category extended to also include `.claude/rules/**/*`
+- Fix: The MCP `core` patterns had a literal-space typo (`src/*/__ init__.py`) that matched nothing — package `__init__.py` files were silently unreachable via `patch core`. Pattern fixed and `src/main.py` (the entry point) added to the category (#42, #43)
+- Fix: `_should_never_patch` switched from `Path.match` to `fnmatch.fnmatchcase` so a bare `"README.md"` entry no longer locks out nested READMEs like `evals/README.md` (#47, #49). Other patterns behave identically; over-matching `**` patterns is strictly safer for never-patch
+- Fix: Several pre-existing pattern gaps filled — MCP `docs` now lists `AGENTS.md`, `CONTRIBUTING.md`, `DEVELOPMENT_PROCESS.md`, `OPENSHIFT_DEPLOYMENT.md`; MCP `build` now lists `.dockerignore`, `.gitignore`, `.gitleaks.toml`; `AGENT_NEVER_PATCH` extended with `tools/**`, `examples/**`, `prompts/**`, `rules/**`, `skills/**`, `.memoryhub.yaml` (#42, #43)
+- Tests: 48 new tests in `tests/test_patch.py` covering the manifest loader, schema validation, fallback paths, the new categories, the matcher fix, and an integration test that exercises `patch check` end-to-end against a fake template that ships its own manifest
 
 ### Version 0.11.1
 
