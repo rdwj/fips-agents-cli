@@ -112,6 +112,38 @@ class TestAgentCategoryPatterns:
         assert ".claude/rules/**/*" in patterns
 
 
+class TestEvalsCategory:
+    """Issue #44: agent / workflow templates ship a full eval harness
+    that needs its own patch category, separated from user-authored
+    test plans and fixtures.
+    """
+
+    def test_evals_category_only_in_agent_categories(self):
+        assert "evals" in AGENT_FILE_CATEGORIES
+        assert "evals" not in MCP_FILE_CATEGORIES
+
+    def test_evals_patterns_cover_harness_files(self):
+        patterns = AGENT_FILE_CATEGORIES["evals"]["patterns"]
+        for expected in [
+            "evals/__init__.py",
+            "evals/assertions.py",
+            "evals/discovery.py",
+            "evals/mock_factory.py",
+            "evals/run_evals.py",
+            "evals/README.md",
+        ]:
+            assert expected in patterns, f"{expected} missing from evals patterns"
+
+    def test_evals_asks_before_patch(self):
+        # Users may have customized the harness — show diffs and confirm
+        assert AGENT_FILE_CATEGORIES["evals"]["ask_before_patch"] is True
+
+    def test_user_authored_eval_inputs_are_never_patched(self):
+        # The user owns evals.yaml (the test plan) and evals/fixtures/ (data)
+        assert "evals/evals.yaml" in AGENT_NEVER_PATCH
+        assert "evals/fixtures/**" in AGENT_NEVER_PATCH
+
+
 class TestAgentNeverPatchExtensions:
     """`add` writes user-customized files into well-known directories.
     Those paths must be in NEVER_PATCH so a future pattern broadening

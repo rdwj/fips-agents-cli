@@ -127,6 +127,18 @@ AGENT_FILE_CATEGORIES = {
         ],
         "ask_before_patch": False,  # Safe to overwrite
     },
+    "evals": {
+        "description": "Evaluation harness (discovery, assertions, runner)",
+        "patterns": [
+            "evals/__init__.py",
+            "evals/assertions.py",
+            "evals/discovery.py",
+            "evals/mock_factory.py",
+            "evals/run_evals.py",
+            "evals/README.md",
+        ],
+        "ask_before_patch": True,  # Users may have customized
+    },
 }
 
 # Files to NEVER patch in agent / workflow projects (user code)
@@ -140,6 +152,8 @@ AGENT_NEVER_PATCH = [
     "prompts/**",  # User-customized agent prompts
     "rules/**",  # User-customized agent rules
     "skills/**",  # User-customized agent skills
+    "evals/evals.yaml",  # User-authored eval test plan
+    "evals/fixtures/**",  # User-authored eval fixtures
     "tests/**/*.py",
     ".env*",
     ".memoryhub.yaml",  # User-customized memory hub config
